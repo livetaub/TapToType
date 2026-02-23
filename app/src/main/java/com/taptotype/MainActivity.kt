@@ -21,28 +21,15 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
 
-/**
- * MainActivity handles the UI for the TapToType app.
- *
- * Features:
- *   - Toggle between Live Input Mode and Send Button Mode
- *   - Bluetooth pairing flow and device selection
- *   - Connection status display with detailed error reporting
- *   - Multi-step setup wizard when not connected
- *   - Dark/Light theme toggle (default: Light)
- *   - Settings with disconnect option
- *   - Text input and send/clear controls
- */
 class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
-        private const val DISCOVERABLE_DURATION = 120 // seconds
+        private const val DISCOVERABLE_DURATION = 120
         private const val PREFS_NAME = "TapToTypePrefs"
-        private const val PREF_THEME_MODE = "theme_mode" // 0=light, 1=dark, 2=system
+        private const val PREF_THEME_MODE = "theme_mode"
     }
 
-    // Bluetooth HID service
     private lateinit var hidService: BluetoothHidService
 
     // UI elements
@@ -53,18 +40,37 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeLabel: TextView
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
-    private lateinit var connectButton: Button
-    private lateinit var discoverableButton: Button
-    private lateinit var deviceListLabel: TextView
     private lateinit var setupHelpButton: Button
+    private lateinit var disconnectButton: Button
     private lateinit var settingsButton: ImageButton
+    private lateinit var deviceListLabel: TextView
 
-    // State
     private var isLiveMode: Boolean = true
     private var previousText: String = ""
-
-    // Setup wizard dialog reference
     private var wizardDialog: AlertDialog? = null
+
+    // Wizard UI refs (held for refreshing from callbacks)
+    private var wizardStatusDot: View? = null
+    private var wizardStatusLabel: TextView? = null
+    private var wizardNextButton: Button? = null
+    private var wizardActionButton: Button? = null
+    private var wizardCurrentStep: Int = 0
+    private var wizardSteps: List<WizardStep>? = null
+
+    // ============================================================
+    // Wizard Step data class
+    // ============================================================
+
+    data class WizardStep(
+        val title: String,
+        val description: String,
+        val hint: String,
+        val canAutoDetect: Boolean,
+        val detectCheck: () -> Boolean,
+        val detectLabel: (Boolean) -> String,
+        val actionLabel: String?,       // Button text, null = no action button
+        val actionCallback: (() -> Unit)?  // What happens when action button tapped
+    )
 
     // ============================================================
     // Permission handling
@@ -92,6 +98,7 @@ class MainActivity : AppCompatActivity() {
         if (allGranted) {
             Log.d(TAG, "All Bluetooth permissions granted")
             initializeBluetooth()
+            refreshWizardStatus()
         } else {
             Log.w(TAG, "Some permissions denied: $permissions")
             Toast.makeText(this, "Bluetooth permissions are required", Toast.LENGTH_LONG).show()
@@ -103,6 +110,7 @@ class MainActivity : AppCompatActivity() {
     ) { result ->
         if (result.resultCode == RESULT_OK) {
             initializeBluetooth()
+            refreshWizardStatus()
         } else {
             Toast.makeText(this, "Bluetooth must be enabled", Toast.LENGTH_SHORT).show()
         }
@@ -114,7 +122,8 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_CANCELED) {
             Toast.makeText(this, "Discoverable mode denied", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Device is now discoverable for $DISCOVERABLE_DURATION seconds", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds ✅", Toast.LENGTH_SHORT).show()
+            refreshWizardStatus()
         }
     }
 
@@ -123,13 +132,10 @@ class MainActivity : AppCompatActivity() {
     // ============================================================
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Apply saved theme before calling super.onCreate
         applySavedTheme()
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize views
         statusIndicator = findViewById(R.id.statusIndicator)
         statusText = findViewById(R.id.statusText)
         inputField = findViewById(R.id.inputField)
@@ -137,15 +143,12 @@ class MainActivity : AppCompatActivity() {
         modeLabel = findViewById(R.id.modeLabel)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
-        connectButton = findViewById(R.id.connectButton)
-        discoverableButton = findViewById(R.id.discoverableButton)
-        deviceListLabel = findViewById(R.id.deviceListLabel)
         setupHelpButton = findViewById(R.id.setupHelpButton)
+        disconnectButton = findViewById(R.id.disconnectButton)
         settingsButton = findViewById(R.id.settingsButton)
+        deviceListLabel = findViewById(R.id.deviceListLabel)
 
-        // Initialize HID service
         hidService = BluetoothHidService(this)
-
         setupUI()
         checkPermissions()
     }
@@ -157,7 +160,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ============================================================
-    // Theme Management
+    // Theme
     // ============================================================
 
     private fun applySavedTheme() {
@@ -170,9 +173,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setThemeMode(mode: Int) {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        prefs.edit().putInt(PREF_THEME_MODE, mode).apply()
-
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit().putInt(PREF_THEME_MODE, mode).apply()
         when (mode) {
             0 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_NO)
             1 -> AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
@@ -185,32 +186,27 @@ class MainActivity : AppCompatActivity() {
     // ============================================================
 
     private fun setupUI() {
-        // Connection state listener
         hidService.onConnectionStateChanged = { connected, status ->
             runOnUiThread {
                 updateConnectionStatus(connected, status)
+                refreshWizardStatus()
             }
         }
 
-        // Detailed status listener — shows real-time debug info
         hidService.onDetailedStatus = { message ->
             runOnUiThread {
-                Log.d(TAG, "[DetailedStatus] $message")
-                // Update device list label with latest detailed status
+                Log.d(TAG, "[Status] $message")
                 deviceListLabel.text = message
             }
         }
 
-        // Mode toggle
-        modeToggle.isChecked = true // Default: Live Input Mode
+        modeToggle.isChecked = true
         updateModeUI(true)
-
         modeToggle.setOnCheckedChangeListener { _, isChecked ->
             isLiveMode = isChecked
             updateModeUI(isChecked)
         }
 
-        // Send button (now an ImageButton)
         sendButton.setOnClickListener {
             val text = inputField.text.toString()
             if (text.isNotEmpty()) {
@@ -223,73 +219,45 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Clear button
         clearButton.setOnClickListener {
             inputField.text.clear()
             previousText = ""
         }
 
-        // Connect button
-        connectButton.setOnClickListener {
-            if (hidService.isConnected) {
-                hidService.disconnect()
-            } else {
-                showDeviceSelectionDialog()
-            }
-        }
-
-        // Discoverable button
-        discoverableButton.setOnClickListener {
-            requestDiscoverableMode()
-        }
-
-        // Setup help button — opens the wizard
         setupHelpButton.setOnClickListener {
             showSetupWizard()
         }
 
-        // Settings button
+        disconnectButton.setOnClickListener {
+            confirmDisconnect()
+        }
+
         settingsButton.setOnClickListener {
             showSettingsDialog()
         }
 
-        // Live mode text watcher
         inputField.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-
             override fun afterTextChanged(s: Editable?) {
-                if (!isLiveMode) return
-                if (!hidService.isConnected) return
-
+                if (!isLiveMode || !hidService.isConnected) return
                 val currentText = s?.toString() ?: ""
-
                 if (currentText.length < previousText.length) {
                     val deletedCount = previousText.length - currentText.length
-                    for (i in 0 until deletedCount) {
-                        hidService.sendBackspace()
-                    }
+                    repeat(deletedCount) { hidService.sendBackspace() }
                 } else if (currentText.length > previousText.length) {
                     val newChars = currentText.substring(previousText.length)
-                    for (char in newChars) {
-                        hidService.sendKeyPress(char)
-                    }
+                    for (char in newChars) { hidService.sendKeyPress(char) }
                 }
-
                 previousText = currentText
             }
         })
 
-        // Handle Enter key in live mode
         inputField.setOnKeyListener { _, keyCode, event ->
             if (isLiveMode && keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
-                if (hidService.isConnected) {
-                    hidService.sendEnter()
-                }
+                if (hidService.isConnected) hidService.sendEnter()
                 false
-            } else {
-                false
-            }
+            } else false
         }
     }
 
@@ -308,21 +276,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateConnectionStatus(connected: Boolean, status: String) {
         statusText.text = status
-
         if (connected) {
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
-            connectButton.text = "Disconnect"
             setupHelpButton.visibility = View.GONE
+            disconnectButton.visibility = View.VISIBLE
             wizardDialog?.dismiss()
         } else {
             statusIndicator.setBackgroundResource(R.drawable.status_disconnected)
-            connectButton.text = "Connect to Device"
             setupHelpButton.visibility = View.VISIBLE
+            disconnectButton.visibility = View.GONE
         }
     }
 
     // ============================================================
-    // Settings Dialog
+    // Settings
     // ============================================================
 
     private fun showSettingsDialog() {
@@ -331,14 +298,9 @@ class MainActivity : AppCompatActivity() {
 
         val items = mutableListOf<String>()
         items.add("🎨  Theme: ${when(currentTheme) { 0 -> "Light ☀️"; 1 -> "Dark 🌙"; else -> "System 🔄" }}")
-
-        if (hidService.isConnected) {
-            items.add("⚡  Disconnect from PC")
-        }
-
+        if (hidService.isConnected) items.add("⚡  Disconnect from PC")
         items.add("🔄  Re-initialize Bluetooth HID")
         items.add("🔍  Show Diagnostics")
-        items.add("📖  Setup Guide")
 
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("⚙️  Settings")
@@ -346,10 +308,8 @@ class MainActivity : AppCompatActivity() {
                 when {
                     which == 0 -> showThemeSelector()
                     hidService.isConnected && which == 1 -> confirmDisconnect()
-                    // Map remaining items dynamically based on whether Disconnect is shown
                     which == (if (hidService.isConnected) 2 else 1) -> reinitializeBluetooth()
                     which == (if (hidService.isConnected) 3 else 2) -> showDiagnostics()
-                    which == (if (hidService.isConnected) 4 else 3) -> showSetupWizard()
                 }
             }
             .setNegativeButton("Close", null)
@@ -359,12 +319,9 @@ class MainActivity : AppCompatActivity() {
     private fun showThemeSelector() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val currentTheme = prefs.getInt(PREF_THEME_MODE, 0)
-
-        val themes = arrayOf("☀️  Light", "🌙  Dark", "🔄  Follow System")
-
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Choose Theme")
-            .setSingleChoiceItems(themes, currentTheme) { dialog, which ->
+            .setSingleChoiceItems(arrayOf("☀️  Light", "🌙  Dark", "🔄  Follow System"), currentTheme) { dialog, which ->
                 setThemeMode(which)
                 dialog.dismiss()
             }
@@ -375,7 +332,7 @@ class MainActivity : AppCompatActivity() {
     private fun confirmDisconnect() {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Disconnect from PC")
-            .setMessage("Are you sure you want to disconnect from the currently connected device?")
+            .setMessage("Are you sure you want to disconnect?")
             .setPositiveButton("Disconnect") { _, _ ->
                 hidService.disconnect()
                 Toast.makeText(this, "Disconnected", Toast.LENGTH_SHORT).show()
@@ -391,15 +348,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Bluetooth HID re-initialized", Toast.LENGTH_SHORT).show()
             statusText.text = "Initializing HID Keyboard..."
         } else {
-            Toast.makeText(this, "Failed to re-initialize HID", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Failed to re-initialize", Toast.LENGTH_SHORT).show()
         }
     }
 
     @SuppressLint("MissingPermission")
     private fun showDiagnostics() {
         val diagInfo = hidService.getDiagnosticInfo()
-
-        val textView = TextView(this).apply {
+        val tv = TextView(this).apply {
             text = diagInfo
             setPadding(48, 32, 48, 32)
             textSize = 12f
@@ -407,22 +363,20 @@ class MainActivity : AppCompatActivity() {
             setTextIsSelectable(true)
             movementMethod = ScrollingMovementMethod()
         }
-
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("🔍  Bluetooth Diagnostics")
-            .setView(textView)
+            .setTitle("🔍  Diagnostics")
+            .setView(tv)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy") { _, _ ->
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                val clip = android.content.ClipData.newPlainText("TapToType Diagnostics", diagInfo)
-                clipboard.setPrimaryClip(clip)
-                Toast.makeText(this, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Diagnostics", diagInfo))
+                Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show()
             }
             .show()
     }
 
     // ============================================================
-    // Setup Wizard Dialog
+    // Setup Wizard
     // ============================================================
 
     @SuppressLint("MissingPermission")
@@ -436,9 +390,16 @@ class MainActivity : AppCompatActivity() {
         val statusRow = view.findViewById<LinearLayout>(R.id.wizardStatusRow)
         val statusDot = view.findViewById<View>(R.id.wizardStatusDot)
         val statusLabel = view.findViewById<TextView>(R.id.wizardStatusLabel)
+        val actionButton = view.findViewById<Button>(R.id.wizardActionButton)
         val backButton = view.findViewById<Button>(R.id.wizardBackButton)
         val nextButton = view.findViewById<Button>(R.id.wizardNextButton)
         val dismissButton = view.findViewById<TextView>(R.id.wizardDismissButton)
+
+        // Save refs for external refresh
+        wizardStatusDot = statusDot
+        wizardStatusLabel = statusLabel
+        wizardNextButton = nextButton
+        wizardActionButton = actionButton
 
         val dots = arrayOf(
             view.findViewById<View>(R.id.wizardDot1),
@@ -448,79 +409,99 @@ class MainActivity : AppCompatActivity() {
             view.findViewById<View>(R.id.wizardDot5)
         )
 
-        var currentStep = 0
-
-        data class WizardStep(
-            val title: String,
-            val description: String,
-            val hint: String,
-            val canAutoDetect: Boolean,
-            val detectCheck: () -> Boolean,
-            val detectLabel: (Boolean) -> String
-        )
+        wizardCurrentStep = 0
 
         val steps = listOf(
             WizardStep(
                 title = "Enable Bluetooth",
                 description = "Make sure Bluetooth is turned on in your phone's Settings.",
-                hint = "Go to Settings → Bluetooth and toggle it ON.\nThe app needs Bluetooth to communicate with your PC.",
+                hint = "The app needs Bluetooth to communicate with your PC.",
                 canAutoDetect = true,
                 detectCheck = { hidService.bluetoothAdapter?.isEnabled == true },
-                detectLabel = { if (it) "✅ Bluetooth is ON" else "❌ Bluetooth is OFF — please enable it" }
+                detectLabel = { if (it) "✅ Bluetooth is ON" else "❌ Bluetooth is OFF" },
+                actionLabel = "Turn On Bluetooth",
+                actionCallback = {
+                    val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
+                    enableBluetoothLauncher.launch(enableIntent)
+                }
             ),
             WizardStep(
                 title = "Grant Permissions",
                 description = "The app needs Bluetooth permissions to discover and connect to your PC.",
-                hint = "If you haven't already, tap \"Allow\" when prompted.\nYou can also go to Settings → Apps → TapToType → Permissions.",
+                hint = "Tap the button below to grant permissions, or go to:\nSettings → Apps → TapToType → Permissions",
                 canAutoDetect = true,
                 detectCheck = {
                     requiredPermissions.all {
                         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
                     }
                 },
-                detectLabel = { if (it) "✅ All permissions granted" else "❌ Some permissions missing — please grant them" }
+                detectLabel = { if (it) "✅ All permissions granted" else "❌ Permissions needed" },
+                actionLabel = "Grant Permissions",
+                actionCallback = {
+                    val missing = requiredPermissions.filter {
+                        ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+                    }
+                    if (missing.isNotEmpty()) {
+                        permissionLauncher.launch(missing.toTypedArray())
+                    } else {
+                        Toast.makeText(this, "All permissions already granted ✅", Toast.LENGTH_SHORT).show()
+                        refreshWizardStatus()
+                    }
+                }
             ),
             WizardStep(
                 title = "Make Phone Discoverable",
-                description = "Tap the \"Make Discoverable\" button on the main screen to let your Windows PC find your phone.",
-                hint = "This makes your phone visible via Bluetooth for 2 minutes.\nDo this BEFORE searching on your PC.",
+                description = "Let your Windows PC find your phone via Bluetooth.",
+                hint = "This makes your phone visible for 2 minutes.\nDo this BEFORE searching on your PC.",
                 canAutoDetect = false,
                 detectCheck = { true },
-                detectLabel = { "Tap \"Make Discoverable\" on the main screen after closing this guide" }
+                detectLabel = { "" },
+                actionLabel = "📡  Make Discoverable",
+                actionCallback = {
+                    requestDiscoverableMode()
+                }
             ),
             WizardStep(
-                title = "Pair from Windows",
-                description = "On your Windows PC, go to:\n\nSettings → Bluetooth & Devices → Add device → Bluetooth",
-                hint = "Your phone should appear in the list as \"TapToType\" or your phone's name.\nSelect it and accept the pairing prompt on BOTH devices.\n\nThis step happens on your Windows PC.",
+                title = "Pair from Windows PC",
+                description = "On your Windows PC, go to:\n\nSettings → Bluetooth & Devices\n→ Add device → Bluetooth",
+                hint = "Select your phone from the list.\nAccept the pairing prompt on BOTH devices.",
                 canAutoDetect = true,
                 detectCheck = { hidService.getPairedDevices().isNotEmpty() },
-                detectLabel = { if (it) "✅ Paired device(s) found" else "⏳ No paired devices detected yet — pair from your PC" }
+                detectLabel = { if (it) "✅ Paired device(s) found" else "⏳ Waiting — pair from your PC" },
+                actionLabel = null,
+                actionCallback = null
             ),
             WizardStep(
-                title = "Connect in the App",
-                description = "Tap \"Connect to Device\" on the main screen and select your Windows PC from the list.",
-                hint = "The status will change to \"Connected as Keyboard\".\nOnce connected, click any text field on your PC and start typing!\n\nIf it fails, try unpairing and re-pairing, or restart Bluetooth on both devices.",
+                title = "Connect to your PC",
+                description = "Select your Windows PC from the list below to connect as a keyboard.",
+                hint = "Once connected, click any text field on your PC and start typing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.isConnected },
-                detectLabel = { if (it) "✅ Connected!" else "⏳ Not connected yet — tap \"Connect to Device\" on the main screen" }
+                detectLabel = { if (it) "✅ Connected!" else "⏳ Not connected yet" },
+                actionLabel = "🔗  Connect to Device",
+                actionCallback = {
+                    showDeviceSelectionDialog()
+                }
             )
         )
+        wizardSteps = steps
 
         fun updateWizardUI() {
-            val step = steps[currentStep]
-            stepBadge.text = "${currentStep + 1}"
+            val step = steps[wizardCurrentStep]
+            stepBadge.text = "${wizardCurrentStep + 1}"
             stepTitle.text = step.title
             stepDescription.text = step.description
             stepHint.text = step.hint
 
             for (i in dots.indices) {
                 when {
-                    i < currentStep -> dots[i].setBackgroundResource(R.drawable.wizard_dot_complete)
-                    i == currentStep -> dots[i].setBackgroundResource(R.drawable.wizard_dot_active)
+                    i < wizardCurrentStep -> dots[i].setBackgroundResource(R.drawable.wizard_dot_complete)
+                    i == wizardCurrentStep -> dots[i].setBackgroundResource(R.drawable.wizard_dot_active)
                     else -> dots[i].setBackgroundResource(R.drawable.wizard_dot_inactive)
                 }
             }
 
+            // Status detection row
             if (step.canAutoDetect) {
                 statusRow.visibility = View.VISIBLE
                 val detected = step.detectCheck()
@@ -536,13 +517,31 @@ class MainActivity : AppCompatActivity() {
                 nextButton.alpha = 1.0f
             }
 
-            backButton.visibility = if (currentStep > 0) View.VISIBLE else View.GONE
-            nextButton.text = if (currentStep == steps.size - 1) "Done" else "Next"
+            // Action button
+            if (step.actionLabel != null && step.actionCallback != null) {
+                actionButton.visibility = View.VISIBLE
+                actionButton.text = step.actionLabel
+
+                // Hide action button if step is already complete
+                if (step.canAutoDetect && step.detectCheck()) {
+                    actionButton.visibility = View.GONE
+                }
+            } else {
+                actionButton.visibility = View.GONE
+            }
+
+            backButton.visibility = if (wizardCurrentStep > 0) View.VISIBLE else View.GONE
+            nextButton.text = if (wizardCurrentStep == steps.size - 1) "Done ✅" else "Next →"
+        }
+
+        // Action button click — delegates to the current step's callback
+        actionButton.setOnClickListener {
+            steps[wizardCurrentStep].actionCallback?.invoke()
         }
 
         nextButton.setOnClickListener {
-            if (currentStep < steps.size - 1) {
-                currentStep++
+            if (wizardCurrentStep < steps.size - 1) {
+                wizardCurrentStep++
                 updateWizardUI()
             } else {
                 wizardDialog?.dismiss()
@@ -550,8 +549,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         backButton.setOnClickListener {
-            if (currentStep > 0) {
-                currentStep--
+            if (wizardCurrentStep > 0) {
+                wizardCurrentStep--
                 updateWizardUI()
             }
         }
@@ -563,12 +562,44 @@ class MainActivity : AppCompatActivity() {
         wizardDialog = AlertDialog.Builder(this, R.style.SetupWizardDialog)
             .setView(view)
             .setCancelable(true)
+            .setOnDismissListener {
+                // Clear refs when dismissed
+                wizardStatusDot = null
+                wizardStatusLabel = null
+                wizardNextButton = null
+                wizardActionButton = null
+                wizardSteps = null
+            }
             .create()
 
         wizardDialog?.window?.setBackgroundDrawableResource(R.drawable.card_background)
-
         updateWizardUI()
         wizardDialog?.show()
+    }
+
+    /**
+     * Refresh the wizard's status indicator from outside (e.g., after a BT callback).
+     * This lets the wizard react in real-time to Bluetooth state changes.
+     */
+    private fun refreshWizardStatus() {
+        val steps = wizardSteps ?: return
+        if (wizardCurrentStep >= steps.size) return
+        val step = steps[wizardCurrentStep]
+
+        if (step.canAutoDetect) {
+            val detected = step.detectCheck()
+            wizardStatusLabel?.text = step.detectLabel(detected)
+            wizardStatusDot?.setBackgroundResource(
+                if (detected) R.drawable.status_connected else R.drawable.status_disconnected
+            )
+            wizardNextButton?.isEnabled = detected
+            wizardNextButton?.alpha = if (detected) 1.0f else 0.5f
+
+            // Hide action button once step is complete
+            if (detected && step.actionLabel != null) {
+                wizardActionButton?.visibility = View.GONE
+            }
+        }
     }
 
     // ============================================================
@@ -576,14 +607,13 @@ class MainActivity : AppCompatActivity() {
     // ============================================================
 
     private fun checkPermissions() {
-        val missingPermissions = requiredPermissions.filter {
+        val missing = requiredPermissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
-
-        if (missingPermissions.isEmpty()) {
+        if (missing.isEmpty()) {
             initializeBluetooth()
         } else {
-            permissionLauncher.launch(missingPermissions.toTypedArray())
+            permissionLauncher.launch(missing.toTypedArray())
         }
     }
 
@@ -595,10 +625,9 @@ class MainActivity : AppCompatActivity() {
     private fun initializeBluetooth() {
         val adapter = hidService.bluetoothAdapter
         if (adapter == null) {
-            Toast.makeText(this, "Bluetooth not available on this device", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "Bluetooth not available", Toast.LENGTH_LONG).show()
             return
         }
-
         if (!adapter.isEnabled) {
             val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
             enableBluetoothLauncher.launch(enableIntent)
@@ -607,33 +636,27 @@ class MainActivity : AppCompatActivity() {
 
         val success = hidService.initialize()
         if (success) {
-            Log.d(TAG, "Bluetooth HID initialization started")
             statusText.text = "Initializing HID Keyboard..."
         } else {
-            Log.e(TAG, "Failed to initialize Bluetooth HID")
             statusText.text = "Failed to initialize HID"
             showErrorDialog(
                 "HID Initialization Failed",
-                "Could not initialize the Bluetooth HID service.\n\n" +
-                        "This usually means your device doesn't support the Bluetooth HID Device profile. " +
-                        "Not all Android phones support acting as a Bluetooth keyboard.\n\n" +
-                        "Try: Settings → Re-initialize Bluetooth HID, or check if your phone manufacturer supports this feature."
+                "Could not initialize Bluetooth HID.\n\n" +
+                        "Your device may not support the Bluetooth HID Device profile.\n\n" +
+                        "Try: Settings ⚙️ → Re-initialize Bluetooth HID"
             )
         }
 
         updatePairedDevicesList()
 
-        // Show wizard automatically if no paired devices
+        // Auto-show wizard if not connected
         if (!hidService.isConnected) {
-            val pairedDevices = hidService.getPairedDevices()
-            if (pairedDevices.isEmpty()) {
-                setupHelpButton.postDelayed({ showSetupWizard() }, 500)
-            }
+            setupHelpButton.postDelayed({ showSetupWizard() }, 500)
         }
     }
 
     // ============================================================
-    // Device selection
+    // Device selection (called from wizard)
     // ============================================================
 
     @SuppressLint("MissingPermission")
@@ -643,13 +666,8 @@ class MainActivity : AppCompatActivity() {
         if (pairedDevices.isEmpty()) {
             showErrorDialog(
                 "No Paired Devices",
-                "No Bluetooth devices are paired with your phone.\n\n" +
-                        "To pair with your Windows PC:\n" +
-                        "1. Tap \"Make Discoverable\" in the app\n" +
-                        "2. On your PC: Settings → Bluetooth & Devices → Add device\n" +
-                        "3. Select your phone from the list\n" +
-                        "4. Accept the pairing on both devices\n\n" +
-                        "Then come back and tap \"Connect to Device\"."
+                "No devices are paired.\n\n" +
+                        "Go back to Step 3 (Make Discoverable) and Step 4 (Pair from PC) first."
             )
             return
         }
@@ -659,28 +677,23 @@ class MainActivity : AppCompatActivity() {
                 BluetoothDevice.DEVICE_TYPE_CLASSIC -> "Classic BT"
                 BluetoothDevice.DEVICE_TYPE_LE -> "⚠️ BLE only"
                 BluetoothDevice.DEVICE_TYPE_DUAL -> "Classic + BLE"
-                else -> "Unknown type"
+                else -> "Unknown"
             }
             "${device.name ?: "Unknown"}\n${device.address} ($typeStr)"
         }.toTypedArray()
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Select Device")
+            .setTitle("Select your PC")
             .setItems(deviceNames) { _, which ->
-                val selectedDevice = pairedDevices[which]
-                Log.d(TAG, "Selected device: ${selectedDevice.name} (${selectedDevice.address})")
-
-                // Show progress
-                statusText.text = "Connecting to ${selectedDevice.name ?: selectedDevice.address}..."
+                val selected = pairedDevices[which]
+                Log.d(TAG, "Selected: ${selected.name} (${selected.address})")
+                statusText.text = "Connecting to ${selected.name ?: selected.address}..."
                 deviceListLabel.text = "Attempting connection..."
 
-                val result = hidService.connectToDevice(selectedDevice)
-
+                val result = hidService.connectToDevice(selected)
                 if (!result.accepted) {
-                    // Connection was rejected immediately — show detailed error
                     showErrorDialog("Connection Failed", result.message)
                 } else {
-                    // Connection was accepted (in progress) — show status
                     Toast.makeText(this, "Connecting...", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -691,11 +704,10 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun updatePairedDevicesList() {
         val devices = hidService.getPairedDevices()
-        if (devices.isEmpty()) {
-            deviceListLabel.text = "No paired devices. Pair your PC first."
+        deviceListLabel.text = if (devices.isEmpty()) {
+            "No paired devices"
         } else {
-            val names = devices.joinToString(", ") { it.name ?: it.address }
-            deviceListLabel.text = "Paired: $names"
+            "Paired: ${devices.joinToString(", ") { it.name ?: it.address }}"
         }
     }
 
@@ -707,18 +719,12 @@ class MainActivity : AppCompatActivity() {
         discoverableLauncher.launch(intent)
     }
 
-    // ============================================================
-    // Error Dialog
-    // ============================================================
-
     private fun showErrorDialog(title: String, message: String) {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("⚠️  $title")
             .setMessage(message)
             .setPositiveButton("OK", null)
-            .setNeutralButton("Show Diagnostics") { _, _ ->
-                showDiagnostics()
-            }
+            .setNeutralButton("Diagnostics") { _, _ -> showDiagnostics() }
             .show()
     }
 }
