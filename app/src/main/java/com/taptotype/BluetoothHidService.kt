@@ -48,6 +48,10 @@ class BluetoothHidService(private val context: Context) {
     private var registerTimeoutRunnable: Runnable? = null
     private var registerRetryCount = 0
 
+    // Flag to distinguish intentional unregister (cleanup/reinit) from
+    // unexpected system unregistration (Android BT stack timeout)
+    private var isCleaningUp = false
+
     // ============================================================
     // In-App Log Buffer
     // ============================================================
@@ -220,11 +224,30 @@ class BluetoothHidService(private val context: Context) {
                     mainHandler.postDelayed({ connectToDevice(device) }, 500)
                 }
             } else {
-                log("W", "HID app unregistered")
-                postDetailedStatus("HID Keyboard was unregistered")
                 isConnected = false
                 connectedDevice = null
-                notifyConnectionState()
+
+                if (isCleaningUp) {
+                    log("I", "HID unregistered (intentional cleanup)")
+                    postDetailedStatus("HID Keyboard unregistered (cleanup)")
+                    notifyConnectionState()
+                } else {
+                    // UNEXPECTED unregistration — Android BT stack killed our registration
+                    // This typically happens ~20s after registerApp() if no device connects.
+                    // Fix: automatically re-register to stay alive.
+                    log("W", "⚠️ UNEXPECTED unregistration by system! Auto-re-registering...")
+                    postDetailedStatus("⚠️ System unregistered HID — re-registering automatically...")
+                    notifyConnectionState()
+
+                    // Re-register after a short delay
+                    registerRetryCount = 0
+                    mainHandler.postDelayed({
+                        if (!isRegistered && hidDevice != null && !isCleaningUp) {
+                            log("I", "Auto-re-registering after unexpected unregistration...")
+                            doRegister()
+                        }
+                    }, 500)
+                }
             }
         }
 
@@ -353,6 +376,7 @@ class BluetoothHidService(private val context: Context) {
         // Clean up existing proxy
         hidDevice?.let { oldProxy ->
             log("D", "Cleaning up previous proxy...")
+            isCleaningUp = true
             try {
                 oldProxy.unregisterApp()
                 log("D", "unregisterApp() called on old proxy")
@@ -360,6 +384,7 @@ class BluetoothHidService(private val context: Context) {
             } catch (e: Exception) {
                 log("W", "Cleanup unregisterApp error: ${e.javaClass.simpleName}: ${e.message}")
             }
+            isCleaningUp = false
             try {
                 adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, oldProxy)
                 log("D", "closeProfileProxy() called")
@@ -402,12 +427,14 @@ class BluetoothHidService(private val context: Context) {
         }
 
         log("D", "Attempting unregisterApp() to clear stale state...")
+        isCleaningUp = true
         try {
             val unregResult = hid.unregisterApp()
             log("D", "unregisterApp() returned: $unregResult")
         } catch (e: Exception) {
             log("D", "unregisterApp() threw (expected if no prior registration): ${e.message}")
         }
+        isCleaningUp = false
 
         mainHandler.postDelayed({ doRegister() }, 500)
     }
@@ -766,6 +793,7 @@ class BluetoothHidService(private val context: Context) {
 
     fun cleanup() {
         log("I", "cleanup() called")
+        isCleaningUp = true
         cancelConnectionTimeout()
         cancelRegisterTimeout()
         try {
@@ -780,6 +808,7 @@ class BluetoothHidService(private val context: Context) {
         isRegistered = false
         isConnected = false
         pendingConnectDevice = null
+        isCleaningUp = false
     }
 
     data class ConnectResult(val accepted: Boolean, val message: String)
