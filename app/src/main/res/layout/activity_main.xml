@@ -191,7 +191,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Tap the \"Make Discoverable\" button above. This lets your Windows PC find your phone for 2 minutes."
+                            android:text="Tap the &quot;Make Discoverable&quot; button above. This lets your Windows PC find your phone for 2 minutes."
                             android:textSize="13sp"
                             android:textColor="@color/text_secondary"
                             android:lineSpacingExtra="2dp" />
@@ -275,7 +275,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Tap \"Connect to Device\" above and select your Windows PC from the paired devices list. The status will change to \"Connected as Keyboard\"."
+                            android:text="Tap &quot;Connect to Device&quot; above and select your Windows PC from the paired devices list. The status will change to &quot;Connected as Keyboard&quot;."
                             android:textSize="13sp"
                             android:textColor="@color/text_secondary"
                             android:lineSpacingExtra="2dp" />
