@@ -302,6 +302,7 @@ class MainActivity : AppCompatActivity() {
         if (!hidService.isRegistered) items.add("🔁  Retry HID Registration")
         items.add("🔄  Re-initialize Bluetooth")
         items.add("🔍  Show Diagnostics")
+        items.add("📋  View Logs")
 
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("⚙️  Settings")
@@ -321,6 +322,8 @@ class MainActivity : AppCompatActivity() {
                         if (which == idx) { reinitializeBluetooth(); return@setItems }
                         idx++
                         if (which == idx) { showDiagnostics(); return@setItems }
+                        idx++
+                        if (which == idx) { showLogs(); return@setItems }
                     }
                 }
             }
@@ -383,6 +386,38 @@ class MainActivity : AppCompatActivity() {
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
                 clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Diagnostics", diagInfo))
                 Toast.makeText(this, "Copied", Toast.LENGTH_SHORT).show()
+            }
+            .show()
+    }
+
+    private fun showLogs() {
+        val logText = hidService.getLogText()
+
+        val scrollView = ScrollView(this)
+        val tv = TextView(this).apply {
+            text = logText
+            setPadding(48, 32, 48, 32)
+            textSize = 11f
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            setTextIsSelectable(true)
+            typeface = android.graphics.Typeface.MONOSPACE
+        }
+        scrollView.addView(tv)
+        // Scroll to bottom
+        scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
+
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("📋  Connection Logs")
+            .setView(scrollView)
+            .setPositiveButton("OK", null)
+            .setNeutralButton("Copy All") { _, _ ->
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TapToType Logs", logText))
+                Toast.makeText(this, "Logs copied to clipboard", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Clear Logs") { _, _ ->
+                hidService.clearLog()
+                Toast.makeText(this, "Logs cleared", Toast.LENGTH_SHORT).show()
             }
             .show()
     }
