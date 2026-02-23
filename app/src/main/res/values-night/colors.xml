@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dark theme colors -->
+    <color name="background">#FF121218</color>
+    <color name="surface">#FF1E1E2A</color>
+    <color name="surface_elevated">#FF282838</color>
+
+    <color name="accent">#FF6C63FF</color>
+    <color name="accent_light">#FF8B83FF</color>
+    <color name="accent_dark">#FF4A42D4</color>
+
+    <color name="success">#FF4ADE80</color>
+    <color name="error">#FFEF4444</color>
+    <color name="warning">#FFFBBF24</color>
+
+    <color name="text_primary">#FFF0F0F5</color>
+    <color name="text_secondary">#FFB0B0C0</color>
+    <color name="text_tertiary">#FF707088</color>
+
+    <color name="input_bg">#FF16161F</color>
+    <color name="input_stroke">#FF333348</color>
+    <color name="input_stroke_focus">#FF6C63FF</color>
+
+    <color name="button_secondary_bg">#FF2A2A3C</color>
+    <color name="button_secondary_text">#FFCCCCDD</color>
+
+    <color name="switch_track">#FF3A3A50</color>
+
+    <color name="divider">#FF2A2A38</color>
+
+    <color name="status_bar">#FF0D0D12</color>
+    <color name="nav_bar">#FF0D0D12</color>
+
+    <!-- Wizard specific -->
+    <color name="wizard_step_inactive">#FF3A3A50</color>
+    <color name="wizard_step_complete">#FF4ADE80</color>
+    <color name="wizard_step_active">#FF6C63FF</color>
+</resources>

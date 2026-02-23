@@ -13,17 +13,40 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <!-- ========== App Title ========== -->
-        <TextView
+        <!-- ========== Top Bar: Title + Settings ========== -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="⌨️ TapToType"
-            android:textSize="28sp"
-            android:textColor="@color/text_primary"
-            android:textStyle="bold"
-            android:fontFamily="sans-serif-medium"
-            android:gravity="center"
-            android:layout_marginBottom="8dp" />
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="8dp">
+
+            <!-- Spacer to center title -->
+            <View
+                android:layout_width="40dp"
+                android:layout_height="1dp" />
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="⌨️ TapToType"
+                android:textSize="28sp"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center" />
+
+            <ImageButton
+                android:id="@+id/settingsButton"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:src="@drawable/ic_settings"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
+                android:contentDescription="Settings"
+                android:padding="8dp" />
+        </LinearLayout>
 
         <TextView
             android:layout_width="match_parent"
@@ -103,246 +126,15 @@
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ========== How to Connect Instructions Card ========== -->
-        <LinearLayout
+        <!-- ========== Setup Help Button (shows when not connected) ========== -->
+        <Button
+            android:id="@+id/setupHelpButton"
+            style="@style/SecondaryButton"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:background="@drawable/card_background"
-            android:padding="16dp"
-            android:layout_marginBottom="16dp">
-
-            <!-- Header row (tap to expand/collapse) -->
-            <LinearLayout
-                android:id="@+id/instructionsHeader"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingTop="2dp"
-                android:paddingBottom="2dp">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="📖  How to Connect to PC"
-                    android:textSize="15sp"
-                    android:textColor="@color/text_primary"
-                    android:fontFamily="sans-serif-medium" />
-
-                <TextView
-                    android:id="@+id/instructionsArrow"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="▼"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_tertiary" />
-            </LinearLayout>
-
-            <!-- Collapsible instructions body -->
-            <LinearLayout
-                android:id="@+id/instructionsBody"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone"
-                android:layout_marginTop="12dp">
-
-                <!-- Divider -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/divider"
-                    android:layout_marginBottom="12dp" />
-
-                <!-- Step 1 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="10dp">
-
-                    <TextView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:text="1"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:background="@drawable/step_badge_bg"
-                        android:layout_marginEnd="12dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Make Phone Discoverable"
-                            android:textSize="14sp"
-                            android:textColor="@color/text_primary"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Tap the &quot;Make Discoverable&quot; button above. This lets your Windows PC find your phone for 2 minutes."
-                            android:textSize="13sp"
-                            android:textColor="@color/text_secondary"
-                            android:lineSpacingExtra="2dp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Step 2 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="10dp">
-
-                    <TextView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:text="2"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:background="@drawable/step_badge_bg"
-                        android:layout_marginEnd="12dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Pair from Windows"
-                            android:textSize="14sp"
-                            android:textColor="@color/text_primary"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="On your PC, go to:\nSettings → Bluetooth &amp; Devices → Add device → Bluetooth\n\nSelect your phone from the list and accept the pairing prompt on both devices."
-                            android:textSize="13sp"
-                            android:textColor="@color/text_secondary"
-                            android:lineSpacingExtra="2dp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Step 3 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="10dp">
-
-                    <TextView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:text="3"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:background="@drawable/step_badge_bg"
-                        android:layout_marginEnd="12dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Connect in App"
-                            android:textSize="14sp"
-                            android:textColor="@color/text_primary"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Tap &quot;Connect to Device&quot; above and select your Windows PC from the paired devices list. The status will change to &quot;Connected as Keyboard&quot;."
-                            android:textSize="13sp"
-                            android:textColor="@color/text_secondary"
-                            android:lineSpacingExtra="2dp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Step 4 -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="4dp">
-
-                    <TextView
-                        android:layout_width="28dp"
-                        android:layout_height="28dp"
-                        android:text="4"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_primary"
-                        android:textStyle="bold"
-                        android:gravity="center"
-                        android:background="@drawable/step_badge_bg"
-                        android:layout_marginEnd="12dp" />
-
-                    <LinearLayout
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:orientation="vertical">
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Start Typing!"
-                            android:textSize="14sp"
-                            android:textColor="@color/text_primary"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Click on any text field on your PC, then type in the input box below. Use Live Mode for real-time input, or Send Mode to type a message and send it all at once."
-                            android:textSize="13sp"
-                            android:textColor="@color/text_secondary"
-                            android:lineSpacingExtra="2dp" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <!-- Divider -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:background="@color/divider"
-                    android:layout_marginTop="10dp"
-                    android:layout_marginBottom="10dp" />
-
-                <!-- Tip -->
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="💡 Tip: If Windows doesn't see your phone, make sure Bluetooth is enabled on both devices and you're within range. Try unpairing and re-pairing if the connection drops."
-                    android:textSize="12sp"
-                    android:textColor="@color/text_tertiary"
-                    android:lineSpacingExtra="2dp"
-                    android:fontFamily="sans-serif" />
-            </LinearLayout>
-        </LinearLayout>
+            android:layout_height="48dp"
+            android:text="📖  Need help connecting? Tap here"
+            android:textSize="14sp"
+            android:layout_marginBottom="16dp" />
 
         <!-- ========== Mode Toggle Card ========== -->
         <LinearLayout
@@ -418,16 +210,17 @@
             android:orientation="horizontal"
             android:gravity="center">
 
-            <Button
+            <ImageButton
                 android:id="@+id/sendButton"
-                style="@style/PrimaryButton"
-                android:layout_width="0dp"
+                android:layout_width="52dp"
                 android:layout_height="52dp"
-                android:layout_weight="1"
-                android:text="⬆  Send"
-                android:textSize="16sp"
+                android:src="@drawable/ic_send"
+                android:background="@drawable/button_primary_bg"
+                android:scaleType="centerInside"
+                android:contentDescription="Send"
                 android:visibility="gone"
-                android:layout_marginEnd="8dp" />
+                android:layout_marginEnd="8dp"
+                android:padding="14dp" />
 
             <Button
                 android:id="@+id/clearButton"

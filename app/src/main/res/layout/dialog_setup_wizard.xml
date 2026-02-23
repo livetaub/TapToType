@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/surface"
+    android:padding="24dp">
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="📡  Connect to your PC"
+        android:textSize="22sp"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Subtitle -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Follow these steps to use your phone as a Bluetooth keyboard"
+        android:textSize="14sp"
+        android:textColor="@color/text_secondary"
+        android:gravity="center"
+        android:layout_marginBottom="20dp" />
+
+    <!-- Step Progress Indicators -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginBottom="24dp">
+
+        <View
+            android:id="@+id/wizardDot1"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/step_badge_bg" />
+
+        <View
+            android:layout_width="32dp"
+            android:layout_height="2dp"
+            android:background="@color/divider"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
+
+        <View
+            android:id="@+id/wizardDot2"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/step_badge_bg" />
+
+        <View
+            android:layout_width="32dp"
+            android:layout_height="2dp"
+            android:background="@color/divider"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
+
+        <View
+            android:id="@+id/wizardDot3"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/step_badge_bg" />
+
+        <View
+            android:layout_width="32dp"
+            android:layout_height="2dp"
+            android:background="@color/divider"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
+
+        <View
+            android:id="@+id/wizardDot4"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/step_badge_bg" />
+
+        <View
+            android:layout_width="32dp"
+            android:layout_height="2dp"
+            android:background="@color/divider"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp" />
+
+        <View
+            android:id="@+id/wizardDot5"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/step_badge_bg" />
+    </LinearLayout>
+
+    <!-- Step Number Badge -->
+    <TextView
+        android:id="@+id/wizardStepBadge"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:text="1"
+        android:textSize="18sp"
+        android:textColor="@android:color/white"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:background="@drawable/step_badge_bg"
+        android:layout_gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <!-- Step Title -->
+    <TextView
+        android:id="@+id/wizardStepTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Enable Bluetooth"
+        android:textSize="18sp"
+        android:textColor="@color/text_primary"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Step Description -->
+    <TextView
+        android:id="@+id/wizardStepDescription"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Make sure Bluetooth is turned on in your phone's settings."
+        android:textSize="15sp"
+        android:textColor="@color/text_secondary"
+        android:gravity="center"
+        android:lineSpacingExtra="4dp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Step Detail / Hint -->
+    <TextView
+        android:id="@+id/wizardStepHint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="13sp"
+        android:textColor="@color/text_tertiary"
+        android:gravity="center"
+        android:lineSpacingExtra="2dp"
+        android:layout_marginBottom="24dp" />
+
+    <!-- Status indicator for auto-detectable steps -->
+    <LinearLayout
+        android:id="@+id/wizardStatusRow"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:visibility="gone"
+        android:layout_marginBottom="16dp">
+
+        <View
+            android:id="@+id/wizardStatusDot"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
+            android:background="@drawable/status_disconnected"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/wizardStatusLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Not detected"
+            android:textSize="13sp"
+            android:textColor="@color/text_tertiary" />
+    </LinearLayout>
+
+    <!-- Navigation Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center">
+
+        <Button
+            android:id="@+id/wizardBackButton"
+            style="@style/SecondaryButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Back"
+            android:visibility="gone"
+            android:layout_marginEnd="8dp" />
+
+        <Button
+            android:id="@+id/wizardNextButton"
+            style="@style/PrimaryButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:text="Next"
+            android:layout_marginStart="8dp" />
+    </LinearLayout>
+
+    <!-- Skip / Dismiss -->
+    <TextView
+        android:id="@+id/wizardDismissButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="I'll do this later"
+        android:textSize="14sp"
+        android:textColor="@color/text_tertiary"
+        android:gravity="center"
+        android:paddingTop="16dp"
+        android:paddingBottom="4dp" />
+
+</LinearLayout>
