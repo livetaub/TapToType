@@ -299,17 +299,29 @@ class MainActivity : AppCompatActivity() {
         val items = mutableListOf<String>()
         items.add("🎨  Theme: ${when(currentTheme) { 0 -> "Light ☀️"; 1 -> "Dark 🌙"; else -> "System 🔄" }}")
         if (hidService.isConnected) items.add("⚡  Disconnect from PC")
-        items.add("🔄  Re-initialize Bluetooth HID")
+        if (!hidService.isRegistered) items.add("🔁  Retry HID Registration")
+        items.add("🔄  Re-initialize Bluetooth")
         items.add("🔍  Show Diagnostics")
 
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("⚙️  Settings")
             .setItems(items.toTypedArray()) { _, which ->
-                when {
-                    which == 0 -> showThemeSelector()
-                    hidService.isConnected && which == 1 -> confirmDisconnect()
-                    which == (if (hidService.isConnected) 2 else 1) -> reinitializeBluetooth()
-                    which == (if (hidService.isConnected) 3 else 2) -> showDiagnostics()
+                var idx = 1
+                when (which) {
+                    0 -> showThemeSelector()
+                    else -> {
+                        if (hidService.isConnected && which == idx) { confirmDisconnect(); return@setItems }
+                        if (hidService.isConnected) idx++
+                        if (!hidService.isRegistered && which == idx) {
+                            hidService.retryRegistration()
+                            Toast.makeText(this, "Retrying HID registration...", Toast.LENGTH_SHORT).show()
+                            return@setItems
+                        }
+                        if (!hidService.isRegistered) idx++
+                        if (which == idx) { reinitializeBluetooth(); return@setItems }
+                        idx++
+                        if (which == idx) { showDiagnostics(); return@setItems }
+                    }
                 }
             }
             .setNegativeButton("Close", null)

@@ -26,51 +26,40 @@ class BluetoothHidService(private val context: Context) {
         private const val KEY_PRESS_DELAY_MS = 20L
         private const val KEY_SEQUENCE_DELAY_MS = 30L
         private const val CONNECT_RETRY_DELAY_MS = 1500L
-        private const val CONNECTION_TIMEOUT_MS = 10000L // 10 seconds
+        private const val CONNECTION_TIMEOUT_MS = 10000L
+        private const val REGISTER_TIMEOUT_MS = 3000L  // Retry registration after 3s
+        private const val MAX_REGISTER_RETRIES = 3
     }
 
-    // Bluetooth components
     private val bluetoothManager: BluetoothManager =
         context.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
     val bluetoothAdapter: BluetoothAdapter? = bluetoothManager.adapter
 
-    // HID Device profile proxy
     private var hidDevice: BluetoothHidDevice? = null
-
-    // Currently connected host device (the Windows PC)
     private var connectedDevice: BluetoothDevice? = null
 
-    // Connection state
     var isRegistered: Boolean = false
         private set
     var isConnected: Boolean = false
         private set
 
-    // Listener for connection state changes (Boolean=connected, String=status message)
     var onConnectionStateChanged: ((Boolean, String) -> Unit)? = null
-
-    // Listener for detailed error/info messages (for UI display)
     var onDetailedStatus: ((String) -> Unit)? = null
 
-    // Handler for main thread operations
     private val mainHandler = Handler(Looper.getMainLooper())
-
-    // Executor for sending key events with delays
     private val keyExecutor = Executors.newSingleThreadExecutor()
+    // Use a persistent executor for HID callbacks (some devices need this)
+    private val hidCallbackExecutor = Executors.newSingleThreadExecutor()
 
-    // Pending device to connect after registration
     private var pendingConnectDevice: BluetoothDevice? = null
-
-    // Connection timeout runnable
     private var connectionTimeoutRunnable: Runnable? = null
+    private var registerTimeoutRunnable: Runnable? = null
+    private var registerRetryCount = 0
 
     // ============================================================
-    // Diagnostic info
+    // Diagnostics
     // ============================================================
 
-    /**
-     * Returns a human-readable diagnostic string of the current state.
-     */
     fun getDiagnosticInfo(): String {
         val adapter = bluetoothAdapter
         val sb = StringBuilder()
@@ -82,6 +71,7 @@ class BluetoothHidService(private val context: Context) {
         sb.appendLine("Connected: $isConnected")
         sb.appendLine("Connected device: ${connectedDevice?.name ?: connectedDevice?.address ?: "None"}")
         sb.appendLine("Pending connect: ${pendingConnectDevice?.name ?: "None"}")
+        sb.appendLine("Register retry count: $registerRetryCount / $MAX_REGISTER_RETRIES")
 
         if (adapter != null && adapter.isEnabled) {
             val bondedDevices = adapter.bondedDevices
@@ -103,7 +93,6 @@ class BluetoothHidService(private val context: Context) {
                 sb.appendLine("  • ${device.name ?: "?"} (${device.address}) — $bondStr, $typeStr")
             }
 
-            // Check if any HID devices are currently connected via the proxy
             hidDevice?.let { hid ->
                 val connectedHidDevices = hid.getConnectedDevices()
                 sb.appendLine("Currently connected HID devices (${connectedHidDevices.size}):")
@@ -118,15 +107,13 @@ class BluetoothHidService(private val context: Context) {
     }
 
     // ============================================================
-    // HID Descriptor for a standard keyboard
+    // HID Descriptor
     // ============================================================
 
     private val hidDescriptor: ByteArray = byteArrayOf(
         0x05.toByte(), 0x01.toByte(),   // Usage Page (Generic Desktop)
         0x09.toByte(), 0x06.toByte(),   // Usage (Keyboard)
         0xA1.toByte(), 0x01.toByte(),   // Collection (Application)
-
-        // Modifier keys
         0x05.toByte(), 0x07.toByte(),
         0x19.toByte(), 0xE0.toByte(),
         0x29.toByte(), 0xE7.toByte(),
@@ -135,26 +122,18 @@ class BluetoothHidService(private val context: Context) {
         0x75.toByte(), 0x01.toByte(),
         0x95.toByte(), 0x08.toByte(),
         0x81.toByte(), 0x02.toByte(),
-
-        // Reserved byte
         0x75.toByte(), 0x08.toByte(),
         0x95.toByte(), 0x01.toByte(),
         0x81.toByte(), 0x01.toByte(),
-
-        // LED output report
         0x05.toByte(), 0x08.toByte(),
         0x19.toByte(), 0x01.toByte(),
         0x29.toByte(), 0x05.toByte(),
         0x75.toByte(), 0x01.toByte(),
         0x95.toByte(), 0x05.toByte(),
         0x91.toByte(), 0x02.toByte(),
-
-        // LED padding
         0x75.toByte(), 0x03.toByte(),
         0x95.toByte(), 0x01.toByte(),
         0x91.toByte(), 0x01.toByte(),
-
-        // Key codes (6 simultaneous keys)
         0x05.toByte(), 0x07.toByte(),
         0x19.toByte(), 0x00.toByte(),
         0x29.toByte(), 0x65.toByte(),
@@ -163,8 +142,7 @@ class BluetoothHidService(private val context: Context) {
         0x75.toByte(), 0x08.toByte(),
         0x95.toByte(), 0x06.toByte(),
         0x81.toByte(), 0x00.toByte(),
-
-        0xC0.toByte()                    // End Collection
+        0xC0.toByte()
     )
 
     // ============================================================
@@ -174,21 +152,23 @@ class BluetoothHidService(private val context: Context) {
     private val hidCallback = object : BluetoothHidDevice.Callback() {
         override fun onAppStatusChanged(pluggedDevice: BluetoothDevice?, registered: Boolean) {
             super.onAppStatusChanged(pluggedDevice, registered)
-            val msg = "HID App status: registered=$registered, device=${pluggedDevice?.name ?: pluggedDevice?.address ?: "none"}"
-            Log.d(TAG, msg)
-            postDetailedStatus(msg)
+            Log.d(TAG, "onAppStatusChanged: registered=$registered, device=${pluggedDevice?.name ?: pluggedDevice?.address ?: "none"}")
             isRegistered = registered
 
+            // Cancel registration timeout since we got a response
+            cancelRegisterTimeout()
+
             if (registered) {
-                Log.i(TAG, "✅ HID Keyboard registered successfully")
+                Log.i(TAG, "✅ HID Keyboard registered successfully!")
+                registerRetryCount = 0
                 postDetailedStatus("✅ HID Keyboard registered — ready to connect")
                 notifyConnectionState()
 
-                // If there's a pending connect, try it now
+                // Process pending connection
                 pendingConnectDevice?.let { device ->
-                    val pendingMsg = "Attempting queued connection to: ${device.name ?: device.address}"
-                    Log.d(TAG, pendingMsg)
-                    postDetailedStatus(pendingMsg)
+                    val msg = "Connecting to queued device: ${device.name ?: device.address}..."
+                    Log.d(TAG, msg)
+                    postDetailedStatus(msg)
                     pendingConnectDevice = null
                     mainHandler.postDelayed({
                         connectToDevice(device)
@@ -196,7 +176,7 @@ class BluetoothHidService(private val context: Context) {
                 }
             } else {
                 Log.w(TAG, "❌ HID Keyboard unregistered")
-                postDetailedStatus("❌ HID Keyboard was unregistered")
+                postDetailedStatus("HID Keyboard was unregistered")
                 isConnected = false
                 connectedDevice = null
                 notifyConnectionState()
@@ -213,11 +193,8 @@ class BluetoothHidService(private val context: Context) {
                 else -> "UNKNOWN ($state)"
             }
             val deviceName = device?.name ?: device?.address ?: "unknown"
-            val msg = "Connection: $stateStr → $deviceName"
-            Log.d(TAG, msg)
-            postDetailedStatus(msg)
+            Log.d(TAG, "onConnectionStateChanged: $stateStr → $deviceName")
 
-            // Cancel connection timeout since we got a callback
             cancelConnectionTimeout()
 
             when (state) {
@@ -228,20 +205,17 @@ class BluetoothHidService(private val context: Context) {
                     postDetailedStatus("✅ Connected as keyboard to $deviceName!")
                 }
                 BluetoothProfile.STATE_CONNECTING -> {
-                    Log.i(TAG, "⏳ Connecting to: $deviceName")
                     postDetailedStatus("⏳ Connecting to $deviceName...")
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     if (device?.address == connectedDevice?.address || connectedDevice == null) {
                         connectedDevice = null
                         isConnected = false
-                        Log.i(TAG, "❌ Disconnected from: $deviceName")
-                        postDetailedStatus("❌ Disconnected from $deviceName")
+                        postDetailedStatus("Disconnected from $deviceName")
                     }
                 }
                 BluetoothProfile.STATE_DISCONNECTING -> {
-                    Log.i(TAG, "⏳ Disconnecting from: $deviceName")
-                    postDetailedStatus("⏳ Disconnecting from $deviceName...")
+                    postDetailedStatus("Disconnecting from $deviceName...")
                 }
             }
             notifyConnectionState()
@@ -249,7 +223,7 @@ class BluetoothHidService(private val context: Context) {
 
         override fun onGetReport(device: BluetoothDevice?, type: Byte, id: Byte, bufferSize: Int) {
             super.onGetReport(device, type, id, bufferSize)
-            Log.d(TAG, "onGetReport: type=$type, id=$id, bufferSize=$bufferSize")
+            Log.d(TAG, "onGetReport: type=$type, id=$id")
             hidDevice?.replyReport(device, type, id, ByteArray(8))
         }
 
@@ -271,19 +245,18 @@ class BluetoothHidService(private val context: Context) {
 
     private val profileListener = object : BluetoothProfile.ServiceListener {
         override fun onServiceConnected(profile: Int, proxy: BluetoothProfile?) {
-            Log.d(TAG, "HID Device service connected (profile=$profile)")
-            postDetailedStatus("HID profile service connected")
+            Log.d(TAG, "HID Device service connected")
+            postDetailedStatus("HID service connected — registering...")
             if (profile == BluetoothProfile.HID_DEVICE) {
                 hidDevice = proxy as BluetoothHidDevice
-                Log.d(TAG, "HID Device proxy obtained ✅")
-                postDetailedStatus("HID proxy obtained — registering app...")
+                registerRetryCount = 0
                 registerHidDevice()
             }
         }
 
         override fun onServiceDisconnected(profile: Int) {
             Log.d(TAG, "HID Device service disconnected")
-            postDetailedStatus("⚠️ HID profile service disconnected")
+            postDetailedStatus("⚠️ HID service disconnected")
             if (profile == BluetoothProfile.HID_DEVICE) {
                 hidDevice = null
                 isRegistered = false
@@ -300,26 +273,33 @@ class BluetoothHidService(private val context: Context) {
 
     fun initialize(): Boolean {
         val adapter = bluetoothAdapter ?: run {
-            Log.e(TAG, "Bluetooth not available")
-            postDetailedStatus("❌ Bluetooth adapter not available on this device")
+            postDetailedStatus("❌ No Bluetooth adapter")
             return false
         }
 
         if (!adapter.isEnabled) {
-            Log.e(TAG, "Bluetooth is not enabled")
-            postDetailedStatus("❌ Bluetooth is not enabled")
+            postDetailedStatus("❌ Bluetooth is off")
             return false
         }
 
-        // If already registered, unregister first for a clean state
-        hidDevice?.let { hid ->
+        // Clean up any existing proxy first
+        hidDevice?.let { oldProxy ->
             try {
-                Log.d(TAG, "Cleaning up previous HID registration...")
+                Log.d(TAG, "Cleaning up previous HID state...")
                 postDetailedStatus("Cleaning up previous session...")
-                hid.unregisterApp()
+                oldProxy.unregisterApp()
+                // Give it a moment to unregister
+                Thread.sleep(200)
             } catch (e: Exception) {
-                Log.w(TAG, "Error unregistering previous HID app", e)
+                Log.w(TAG, "Error during cleanup", e)
             }
+            try {
+                adapter.closeProfileProxy(BluetoothProfile.HID_DEVICE, oldProxy)
+            } catch (e: Exception) {
+                Log.w(TAG, "Error closing old proxy", e)
+            }
+            hidDevice = null
+            isRegistered = false
         }
 
         Log.d(TAG, "Requesting HID Device profile proxy...")
@@ -327,11 +307,9 @@ class BluetoothHidService(private val context: Context) {
         val result = adapter.getProfileProxy(context, profileListener, BluetoothProfile.HID_DEVICE)
 
         if (!result) {
-            Log.e(TAG, "❌ getProfileProxy returned false — device may not support HID_DEVICE profile")
-            postDetailedStatus("❌ Your device does not support the Bluetooth HID Device profile.\nThis feature requires manufacturer support.")
+            postDetailedStatus("❌ Device does not support Bluetooth HID profile")
         } else {
-            Log.d(TAG, "getProfileProxy returned true — waiting for service connection callback...")
-            postDetailedStatus("Waiting for HID profile service...")
+            postDetailedStatus("Waiting for HID service...")
         }
 
         return result
@@ -339,8 +317,27 @@ class BluetoothHidService(private val context: Context) {
 
     private fun registerHidDevice() {
         val hid = hidDevice ?: run {
-            Log.e(TAG, "HID Device proxy not available")
-            postDetailedStatus("❌ HID proxy not available — cannot register")
+            postDetailedStatus("❌ HID proxy lost")
+            return
+        }
+
+        // Try unregistering first in case a stale registration exists
+        try {
+            hid.unregisterApp()
+            Log.d(TAG, "Unregistered previous app (if any)")
+        } catch (e: Exception) {
+            Log.d(TAG, "No previous registration to clear: ${e.message}")
+        }
+
+        // Small delay after unregister before re-registering
+        mainHandler.postDelayed({
+            doRegister()
+        }, 500)
+    }
+
+    private fun doRegister() {
+        val hid = hidDevice ?: run {
+            postDetailedStatus("❌ HID proxy lost during registration")
             return
         }
 
@@ -357,130 +354,149 @@ class BluetoothHidService(private val context: Context) {
             800, 9, 0, 11250, 11250
         )
 
-        Log.d(TAG, "Calling registerApp()...")
-        postDetailedStatus("Registering as HID keyboard...")
-        val result = hid.registerApp(sdpRecord, null, qosOut, Executors.newSingleThreadExecutor(), hidCallback)
-        Log.d(TAG, "registerApp result: $result")
+        registerRetryCount++
+        Log.d(TAG, "Calling registerApp() — attempt $registerRetryCount/$MAX_REGISTER_RETRIES")
+        postDetailedStatus("Registering HID keyboard (attempt $registerRetryCount)...")
 
-        if (!result) {
-            Log.e(TAG, "❌ registerApp() returned false")
-            postDetailedStatus("❌ Failed to register HID keyboard.\nYour device may not fully support the Bluetooth HID Device profile.\nSome manufacturers disable this feature.")
-            mainHandler.post {
-                onConnectionStateChanged?.invoke(false, "HID registration failed — device may not support HID")
-            }
+        val result: Boolean
+        try {
+            result = hid.registerApp(sdpRecord, null, qosOut, hidCallbackExecutor, hidCallback)
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception in registerApp()", e)
+            postDetailedStatus("❌ registerApp() threw: ${e.message}")
+            scheduleRegistrationRetry()
+            return
+        }
+
+        Log.d(TAG, "registerApp() returned: $result")
+
+        if (result) {
+            postDetailedStatus("registerApp() accepted — waiting for callback...")
+            // Start a timeout — if onAppStatusChanged doesn't fire, retry
+            startRegisterTimeout()
         } else {
-            postDetailedStatus("registerApp() accepted — waiting for confirmation...")
+            Log.e(TAG, "registerApp() returned false")
+            postDetailedStatus("❌ registerApp() returned false (attempt $registerRetryCount)")
+            scheduleRegistrationRetry()
+        }
+    }
+
+    private fun startRegisterTimeout() {
+        cancelRegisterTimeout()
+        registerTimeoutRunnable = Runnable {
+            if (!isRegistered) {
+                Log.w(TAG, "Registration timeout — callback never fired (attempt $registerRetryCount)")
+                postDetailedStatus("⏰ Registration timed out (attempt $registerRetryCount)")
+                scheduleRegistrationRetry()
+            }
+        }
+        mainHandler.postDelayed(registerTimeoutRunnable!!, REGISTER_TIMEOUT_MS)
+    }
+
+    private fun cancelRegisterTimeout() {
+        registerTimeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+        registerTimeoutRunnable = null
+    }
+
+    private fun scheduleRegistrationRetry() {
+        if (registerRetryCount < MAX_REGISTER_RETRIES) {
+            val delay = 1000L * registerRetryCount // Increasing delay: 1s, 2s, 3s
+            postDetailedStatus("🔄 Retrying registration in ${delay / 1000}s... (${registerRetryCount}/$MAX_REGISTER_RETRIES)")
+            mainHandler.postDelayed({
+                if (!isRegistered && hidDevice != null) {
+                    doRegister()
+                }
+            }, delay)
+        } else {
+            val msg = "❌ HID registration failed after $MAX_REGISTER_RETRIES attempts.\n\n" +
+                    "Try these steps:\n" +
+                    "1. Toggle Bluetooth OFF and ON\n" +
+                    "2. Restart the app\n" +
+                    "3. Restart your phone\n\n" +
+                    "Some phones don't fully support HID Device profile."
+            Log.e(TAG, msg)
+            postDetailedStatus(msg)
+            mainHandler.post {
+                onConnectionStateChanged?.invoke(false, "HID registration failed — tap Settings to retry")
+            }
         }
     }
 
     /**
-     * Connect to a specific Bluetooth device (the Windows PC).
-     * Returns a detailed status string for the UI.
+     * Force re-register the HID app. Can be called from UI.
      */
+    fun retryRegistration() {
+        registerRetryCount = 0
+        val hid = hidDevice
+        if (hid != null) {
+            registerHidDevice()
+        } else {
+            initialize()
+        }
+    }
+
     fun connectToDevice(device: BluetoothDevice): ConnectResult {
         val deviceName = device.name ?: device.address
-        Log.d(TAG, "connectToDevice called for: $deviceName (${device.address})")
-        Log.d(TAG, "  Current state: hidDevice=${hidDevice != null}, isRegistered=$isRegistered, isConnected=$isConnected")
 
-        // 1) Check if HID proxy is available
+        // 1) Check HID proxy
         val hid = hidDevice
         if (hid == null) {
-            val msg = "HID service not ready. Queued connection — will retry after initialization."
-            Log.w(TAG, msg)
-            postDetailedStatus("⏳ $msg")
             pendingConnectDevice = device
-
-            // Try to re-initialize
             val initResult = initialize()
             return if (initResult) {
-                ConnectResult(false, "HID service initializing... connection queued for $deviceName")
+                ConnectResult(true, "Setting up Bluetooth HID...\nWill connect to $deviceName automatically.")
             } else {
                 pendingConnectDevice = null
-                ConnectResult(false, "Failed to initialize Bluetooth HID service. Your device may not support HID.")
+                ConnectResult(false, "Bluetooth HID not available on this device.")
             }
         }
 
-        // 2) Check if HID app is registered
+        // 2) Check registration
         if (!isRegistered) {
-            val msg = "HID app not registered yet. Connection queued — will connect after registration."
-            Log.w(TAG, msg)
-            postDetailedStatus("⏳ $msg")
             pendingConnectDevice = device
-            return ConnectResult(false, "HID registering... connection queued for $deviceName.\nPlease wait a moment and try again.")
+            postDetailedStatus("⏳ HID registering — $deviceName queued for connection")
+            // Kick registration if it's stalled
+            if (registerRetryCount >= MAX_REGISTER_RETRIES) {
+                registerRetryCount = 0
+                doRegister()
+            }
+            return ConnectResult(true, "Setting up HID keyboard...\nWill connect to $deviceName when ready.")
         }
 
         // 3) Check bond state
-        val bondState = device.bondState
-        Log.d(TAG, "  Bond state: $bondState")
-        if (bondState != BluetoothDevice.BOND_BONDED) {
-            val bondStr = when (bondState) {
-                BluetoothDevice.BOND_NONE -> "not paired"
-                BluetoothDevice.BOND_BONDING -> "pairing in progress"
-                else -> "unknown bond state ($bondState)"
-            }
-            val msg = "Device $deviceName is $bondStr. Please pair first via Bluetooth settings."
-            Log.e(TAG, msg)
-            postDetailedStatus("❌ $msg")
-            mainHandler.post {
-                onConnectionStateChanged?.invoke(false, "Not paired with $deviceName")
-            }
-            return ConnectResult(false, msg)
+        if (device.bondState != BluetoothDevice.BOND_BONDED) {
+            return ConnectResult(false, "$deviceName is not paired.\nPlease pair first via Bluetooth settings.")
         }
 
         // 4) Check device type
-        val deviceType = device.type
-        Log.d(TAG, "  Device type: $deviceType")
-        val typeStr = when (deviceType) {
-            BluetoothDevice.DEVICE_TYPE_CLASSIC -> "Classic"
-            BluetoothDevice.DEVICE_TYPE_LE -> "BLE-only"
-            BluetoothDevice.DEVICE_TYPE_DUAL -> "Dual (Classic+BLE)"
-            else -> "Unknown"
-        }
-        postDetailedStatus("Device: $deviceName — Type: $typeStr, Bonded: yes")
-
-        // BLE-only devices won't work with HID classic
-        if (deviceType == BluetoothDevice.DEVICE_TYPE_LE) {
-            val msg = "$deviceName is BLE-only. Bluetooth HID requires Classic Bluetooth. This device cannot be used."
-            Log.e(TAG, msg)
-            postDetailedStatus("❌ $msg")
-            return ConnectResult(false, msg)
+        if (device.type == BluetoothDevice.DEVICE_TYPE_LE) {
+            return ConnectResult(false, "$deviceName is BLE-only.\nBluetooth HID requires Classic Bluetooth.")
         }
 
-        // 5) Check if already connected to something — disconnect first
+        // 5) Disconnect stale devices
         val connectedHidDevices = hid.getConnectedDevices()
-        Log.d(TAG, "  Currently connected HID devices: ${connectedHidDevices.size}")
         if (connectedHidDevices.isNotEmpty()) {
             for (d in connectedHidDevices) {
                 if (d.address == device.address) {
-                    // Already connected to this device!
-                    val msg = "Already connected to $deviceName!"
-                    Log.d(TAG, msg)
                     connectedDevice = device
                     isConnected = true
                     notifyConnectionState()
-                    return ConnectResult(true, msg)
+                    return ConnectResult(true, "Already connected to $deviceName!")
                 }
-                Log.d(TAG, "  Disconnecting stale device: ${d.name ?: d.address}")
-                postDetailedStatus("Disconnecting from ${d.name ?: d.address} first...")
                 hid.disconnect(d)
             }
-            // Wait a bit then retry
-            postDetailedStatus("⏳ Disconnected stale device. Retrying in 1.5s...")
-            mainHandler.postDelayed({
-                doConnect(hid, device)
-            }, CONNECT_RETRY_DELAY_MS)
-            return ConnectResult(true, "Disconnecting previous device, then connecting to $deviceName...")
+            postDetailedStatus("Disconnected stale device, retrying...")
+            mainHandler.postDelayed({ doConnect(hid, device) }, CONNECT_RETRY_DELAY_MS)
+            return ConnectResult(true, "Clearing previous connection, then connecting...")
         }
 
-        // 6) Attempt connection
+        // 6) Connect
         return doConnect(hid, device)
     }
 
     private fun doConnect(hid: BluetoothHidDevice, device: BluetoothDevice): ConnectResult {
         val deviceName = device.name ?: device.address
-        Log.d(TAG, ">>> Calling hid.connect(${device.address})...")
-        postDetailedStatus("⏳ Sending connect request to $deviceName...")
-
+        postDetailedStatus("⏳ Connecting to $deviceName...")
         mainHandler.post {
             onConnectionStateChanged?.invoke(false, "Connecting to $deviceName...")
         }
@@ -489,50 +505,26 @@ class BluetoothHidService(private val context: Context) {
         try {
             result = hid.connect(device)
         } catch (e: Exception) {
-            val msg = "Exception during connect(): ${e.message}"
-            Log.e(TAG, msg, e)
-            postDetailedStatus("❌ $msg")
-            mainHandler.post {
-                onConnectionStateChanged?.invoke(false, "Connection error: ${e.message}")
-            }
-            return ConnectResult(false, msg)
+            postDetailedStatus("❌ Connect exception: ${e.message}")
+            return ConnectResult(false, "Connection error: ${e.message}")
         }
 
-        Log.d(TAG, ">>> connect() returned: $result")
+        Log.d(TAG, "connect() returned: $result")
 
         if (result) {
-            postDetailedStatus("✅ Connect request accepted — waiting for PC to respond...")
-
-            // Start connection timeout
+            postDetailedStatus("✅ Connect request sent — waiting for $deviceName to respond...")
             startConnectionTimeout(deviceName)
-
-            return ConnectResult(true, "Connection request sent to $deviceName.\nWaiting for response...")
+            return ConnectResult(true, "Connecting to $deviceName...\nWaiting for PC to respond.")
         } else {
-            // connect() returned false — detailed diagnosis
-            val diag = StringBuilder()
-            diag.appendLine("❌ connect() returned false for $deviceName")
-            diag.appendLine("")
-            diag.appendLine("Possible causes:")
-            diag.appendLine("• The PC may need to be re-paired")
-            diag.appendLine("• Another app may be using the HID profile")
-            diag.appendLine("• Your phone's Bluetooth stack may need a restart")
-            diag.appendLine("")
-            diag.appendLine("Try these steps:")
-            diag.appendLine("1. On PC: Remove the phone from Bluetooth devices")
-            diag.appendLine("2. On Phone: Remove the PC from Bluetooth settings")
-            diag.appendLine("3. Restart Bluetooth on both devices")
-            diag.appendLine("4. Re-pair from scratch")
-            diag.appendLine("5. In the app: Settings → Re-initialize Bluetooth HID")
-
-            val diagStr = diag.toString()
-            Log.e(TAG, diagStr)
-            postDetailedStatus(diagStr)
-
-            mainHandler.post {
-                onConnectionStateChanged?.invoke(false, "Connection rejected — try re-pairing")
-            }
-
-            return ConnectResult(false, diagStr)
+            val msg = "Connection to $deviceName was rejected.\n\n" +
+                    "Try these steps:\n" +
+                    "1. On PC: Remove the phone from Bluetooth devices\n" +
+                    "2. On Phone: Remove the PC from Bluetooth\n" +
+                    "3. Toggle Bluetooth OFF/ON on both\n" +
+                    "4. Re-pair from scratch\n" +
+                    "5. Settings → Re-initialize Bluetooth HID"
+            postDetailedStatus("❌ connect() returned false")
+            return ConnectResult(false, msg)
         }
     }
 
@@ -540,16 +532,9 @@ class BluetoothHidService(private val context: Context) {
         cancelConnectionTimeout()
         connectionTimeoutRunnable = Runnable {
             if (!isConnected) {
-                val msg = "⏰ Connection to $deviceName timed out after ${CONNECTION_TIMEOUT_MS / 1000}s.\n\n" +
-                        "The PC did not respond. Try:\n" +
-                        "• Make sure the PC's Bluetooth is on\n" +
-                        "• Remove and re-pair the devices\n" +
-                        "• Restart Bluetooth on both devices\n" +
-                        "• Move closer to the PC"
-                Log.w(TAG, msg)
-                postDetailedStatus(msg)
+                postDetailedStatus("⏰ Connection to $deviceName timed out")
                 mainHandler.post {
-                    onConnectionStateChanged?.invoke(false, "Connection timed out — PC did not respond")
+                    onConnectionStateChanged?.invoke(false, "Connection timed out — try again")
                 }
             }
         }
@@ -564,7 +549,6 @@ class BluetoothHidService(private val context: Context) {
     fun disconnect() {
         val hid = hidDevice ?: return
         val device = connectedDevice ?: return
-        Log.d(TAG, "Disconnecting from: ${device.name ?: device.address}")
         postDetailedStatus("Disconnecting from ${device.name ?: device.address}...")
         hid.disconnect(device)
     }
@@ -574,18 +558,12 @@ class BluetoothHidService(private val context: Context) {
     }
 
     // ============================================================
-    // Key Event Sending
+    // Key Sending
     // ============================================================
 
     fun sendKeyPress(char: Char): Boolean {
-        if (!isConnected) {
-            Log.w(TAG, "Not connected, cannot send key")
-            return false
-        }
-        val keyEvent = HidKeyMapper.charToHidKeyEvent(char) ?: run {
-            Log.w(TAG, "Unsupported character: '$char' (${char.code})")
-            return false
-        }
+        if (!isConnected) return false
+        val keyEvent = HidKeyMapper.charToHidKeyEvent(char) ?: return false
         return sendHidReport(keyEvent)
     }
 
@@ -593,33 +571,23 @@ class BluetoothHidService(private val context: Context) {
         if (!isConnected) return false
         val hid = hidDevice ?: return false
         val device = connectedDevice ?: return false
-
         keyExecutor.execute {
             try {
                 hid.sendReport(device, 0, HidKeyMapper.createBackspaceReport())
                 Thread.sleep(KEY_PRESS_DELAY_MS)
                 hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending backspace", e)
-            }
+            } catch (e: Exception) { Log.e(TAG, "Error sending backspace", e) }
         }
         return true
     }
 
     fun sendString(text: String) {
-        if (!isConnected) {
-            Log.w(TAG, "Not connected, cannot send string")
-            return
-        }
+        if (!isConnected) return
         keyExecutor.execute {
             for (char in text) {
-                val keyEvent = HidKeyMapper.charToHidKeyEvent(char)
-                if (keyEvent != null) {
-                    sendHidReportSync(keyEvent)
-                    Thread.sleep(KEY_SEQUENCE_DELAY_MS)
-                } else {
-                    Log.w(TAG, "Skipping unsupported character: '$char'")
-                }
+                val keyEvent = HidKeyMapper.charToHidKeyEvent(char) ?: continue
+                sendHidReportSync(keyEvent)
+                Thread.sleep(KEY_SEQUENCE_DELAY_MS)
             }
         }
     }
@@ -628,35 +596,29 @@ class BluetoothHidService(private val context: Context) {
         if (!isConnected) return false
         val hid = hidDevice ?: return false
         val device = connectedDevice ?: return false
-
         keyExecutor.execute {
             try {
                 hid.sendReport(device, 0, HidKeyMapper.createEnterReport())
                 Thread.sleep(KEY_PRESS_DELAY_MS)
                 hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending enter", e)
-            }
+            } catch (e: Exception) { Log.e(TAG, "Error sending enter", e) }
         }
         return true
     }
 
     // ============================================================
-    // Internal helpers
+    // Internal
     // ============================================================
 
     private fun sendHidReport(event: HidKeyMapper.HidKeyEvent): Boolean {
         val hid = hidDevice ?: return false
         val device = connectedDevice ?: return false
-
         keyExecutor.execute {
             try {
                 hid.sendReport(device, 0, HidKeyMapper.createKeyDownReport(event))
                 Thread.sleep(KEY_PRESS_DELAY_MS)
                 hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending HID report", e)
-            }
+            } catch (e: Exception) { Log.e(TAG, "Error sending HID report", e) }
         }
         return true
     }
@@ -664,46 +626,38 @@ class BluetoothHidService(private val context: Context) {
     private fun sendHidReportSync(event: HidKeyMapper.HidKeyEvent) {
         val hid = hidDevice ?: return
         val device = connectedDevice ?: return
-
         try {
             hid.sendReport(device, 0, HidKeyMapper.createKeyDownReport(event))
             Thread.sleep(KEY_PRESS_DELAY_MS)
             hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
-        } catch (e: Exception) {
-            Log.e(TAG, "Error sending HID report (sync)", e)
-        }
+        } catch (e: Exception) { Log.e(TAG, "Error sending HID report (sync)", e) }
     }
 
     private fun notifyConnectionState() {
         mainHandler.post {
-            val statusMessage = when {
+            val msg = when {
                 isConnected -> "Connected as Keyboard to ${connectedDevice?.name ?: connectedDevice?.address ?: "Unknown"}"
                 isRegistered -> "Ready — Tap 'Connect to Device'"
                 else -> "Not Connected"
             }
-            onConnectionStateChanged?.invoke(isConnected, statusMessage)
+            onConnectionStateChanged?.invoke(isConnected, msg)
         }
     }
 
     private fun postDetailedStatus(message: String) {
-        mainHandler.post {
-            onDetailedStatus?.invoke(message)
-        }
+        mainHandler.post { onDetailedStatus?.invoke(message) }
     }
 
     fun cleanup() {
         cancelConnectionTimeout()
+        cancelRegisterTimeout()
         try {
             hidDevice?.let { hid ->
-                connectedDevice?.let { device ->
-                    hid.disconnect(device)
-                }
+                connectedDevice?.let { hid.disconnect(it) }
                 hid.unregisterApp()
             }
             bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error during cleanup", e)
-        }
+        } catch (e: Exception) { Log.e(TAG, "Error during cleanup", e) }
         hidDevice = null
         connectedDevice = null
         isRegistered = false
@@ -711,12 +665,5 @@ class BluetoothHidService(private val context: Context) {
         pendingConnectDevice = null
     }
 
-    // ============================================================
-    // Result class
-    // ============================================================
-
-    data class ConnectResult(
-        val accepted: Boolean,
-        val message: String
-    )
+    data class ConnectResult(val accepted: Boolean, val message: String)
 }
