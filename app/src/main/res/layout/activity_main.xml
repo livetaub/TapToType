@@ -53,6 +53,7 @@
             android:text="Turn your phone into a Bluetooth keyboard"
             android:textSize="14sp"
             android:textColor="@color/text_secondary"
+            android:fontFamily="sans-serif"
             android:gravity="center"
             android:layout_marginBottom="24dp" />
 
@@ -96,6 +97,7 @@
                 android:layout_height="wrap_content"
                 android:text="No paired devices"
                 android:textSize="12sp"
+                android:fontFamily="sans-serif"
                 android:textColor="@color/text_tertiary" />
         </LinearLayout>
 
@@ -107,6 +109,7 @@
             android:layout_height="56dp"
             android:text="📡  Connect to a PC"
             android:textSize="16sp"
+            android:fontFamily="sans-serif-medium"
             android:layout_marginBottom="16dp" />
 
         <!-- ========== Disconnect Button (shows when connected) ========== -->
@@ -117,10 +120,11 @@
             android:layout_height="48dp"
             android:text="⚡  Disconnect"
             android:textSize="14sp"
+            android:fontFamily="sans-serif-medium"
             android:visibility="gone"
             android:layout_marginBottom="16dp" />
 
-        <!-- ========== Mode Toggle Card ========== -->
+        <!-- ========== Mode Selector Card (Dropdown) ========== -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -131,23 +135,24 @@
             android:layout_marginBottom="16dp">
 
             <TextView
-                android:id="@+id/modeLabel"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="Mode: Live Input"
-                android:textSize="15sp"
-                android:textColor="@color/text_primary"
-                android:fontFamily="sans-serif-medium" />
-
-            <Switch
-                android:id="@+id/modeToggle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:checked="true"
-                android:thumbTint="@color/accent"
-                android:trackTint="@color/switch_track"
-                tools:ignore="UseSwitchCompatOrMaterialCode" />
+                android:text="Mode"
+                android:textSize="15sp"
+                android:textColor="@color/text_primary"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginEnd="16dp" />
+
+            <Spinner
+                android:id="@+id/modeSpinner"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:background="@drawable/input_background"
+                android:paddingStart="12dp"
+                android:paddingEnd="12dp"
+                android:popupBackground="@color/surface"
+                android:fontFamily="sans-serif" />
         </LinearLayout>
 
         <!-- ========== Text Input Card ========== -->
@@ -160,30 +165,33 @@
             android:layout_marginBottom="16dp">
 
             <TextView
+                android:id="@+id/inputLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Keyboard Input"
-                android:textSize="13sp"
+                android:text="KEYBOARD INPUT"
+                android:textSize="12sp"
                 android:textColor="@color/text_tertiary"
                 android:textAllCaps="true"
-                android:letterSpacing="0.1"
+                android:letterSpacing="0.08"
+                android:fontFamily="sans-serif-medium"
                 android:layout_marginBottom="8dp" />
 
             <EditText
                 android:id="@+id/inputField"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="120dp"
+                android:minHeight="200dp"
                 android:background="@drawable/input_background"
-                android:padding="14dp"
-                android:textSize="16sp"
+                android:padding="16dp"
+                android:textSize="17sp"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_tertiary"
                 android:hint="Start typing — keystrokes sent live..."
-                android:fontFamily="monospace"
+                android:fontFamily="sans-serif"
                 android:gravity="top|start"
                 android:inputType="textMultiLine"
                 android:importantForAutofill="no"
+                android:lineSpacingExtra="4dp"
                 tools:ignore="LabelFor" />
         </LinearLayout>
 
@@ -196,8 +204,8 @@
 
             <ImageButton
                 android:id="@+id/sendButton"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
                 android:src="@drawable/ic_send"
                 android:background="@drawable/button_primary_bg"
                 android:scaleType="centerInside"
@@ -210,10 +218,11 @@
                 android:id="@+id/clearButton"
                 style="@style/SecondaryButton"
                 android:layout_width="0dp"
-                android:layout_height="52dp"
+                android:layout_height="56dp"
                 android:layout_weight="1"
                 android:text="✕  Clear"
                 android:textSize="16sp"
+                android:fontFamily="sans-serif-medium"
                 android:layout_marginStart="8dp" />
         </LinearLayout>
 

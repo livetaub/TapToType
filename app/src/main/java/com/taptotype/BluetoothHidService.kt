@@ -20,8 +20,9 @@ class BluetoothHidService(private val context: Context) {
         private const val CONNECT_RETRY_DELAY_MS = 1500L
         private const val CONNECTION_TIMEOUT_MS = 10000L
         private const val REGISTER_TIMEOUT_MS = 3000L
-        private const val MAX_REGISTER_RETRIES = 3
+        private const val MAX_REGISTER_RETRIES = 5
         private const val MAX_LOG_ENTRIES = 200
+        private const val KEEP_ALIVE_INTERVAL_MS = 30_000L  // Send keep-alive every 30s
     }
 
     private val bluetoothManager: BluetoothManager =
@@ -39,6 +40,9 @@ class BluetoothHidService(private val context: Context) {
     var onConnectionStateChanged: ((Boolean, String) -> Unit)? = null
     var onDetailedStatus: ((String) -> Unit)? = null
 
+    /** When true, Enter sends Shift+Enter (line break in chat apps) */
+    var useShiftEnter: Boolean = false
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val keyExecutor = Executors.newSingleThreadExecutor()
     private val hidCallbackExecutor = Executors.newSingleThreadExecutor()
@@ -47,6 +51,7 @@ class BluetoothHidService(private val context: Context) {
     private var connectionTimeoutRunnable: Runnable? = null
     private var registerTimeoutRunnable: Runnable? = null
     private var registerRetryCount = 0
+    private var keepAliveRunnable: Runnable? = null
 
     // Flag to distinguish intentional unregister (cleanup/reinit) from
     // unexpected system unregistration (Android BT stack timeout)
@@ -280,6 +285,7 @@ class BluetoothHidService(private val context: Context) {
                     isConnected = true
                     log("I", "✅ Connected to $deviceName")
                     postDetailedStatus("✅ Connected as keyboard to $deviceName!")
+                    startKeepAlive()
                 }
                 BluetoothProfile.STATE_CONNECTING -> {
                     log("D", "Connecting to $deviceName...")
@@ -287,6 +293,7 @@ class BluetoothHidService(private val context: Context) {
                 }
                 BluetoothProfile.STATE_DISCONNECTED -> {
                     log("I", "Disconnected from $deviceName")
+                    stopKeepAlive()
                     if (device?.address == connectedDevice?.address || connectedDevice == null) {
                         connectedDevice = null
                         isConnected = false
@@ -705,6 +712,7 @@ class BluetoothHidService(private val context: Context) {
     }
 
     fun disconnect() {
+        stopKeepAlive()
         val hid = hidDevice ?: return
         val device = connectedDevice ?: return
         log("I", "Disconnecting from ${device.name ?: device.address}...")
@@ -713,6 +721,45 @@ class BluetoothHidService(private val context: Context) {
     }
 
     fun getPairedDevices(): Set<BluetoothDevice> = bluetoothAdapter?.bondedDevices ?: emptySet()
+
+    // ============================================================
+    // Keep-Alive (prevents Windows from dropping idle HID connection)
+    // ============================================================
+
+    private fun startKeepAlive() {
+        stopKeepAlive()
+        log("D", "Starting keep-alive (every ${KEEP_ALIVE_INTERVAL_MS / 1000}s)")
+        keepAliveRunnable = object : Runnable {
+            override fun run() {
+                if (isConnected) {
+                    val hid = hidDevice
+                    val device = connectedDevice
+                    if (hid != null && device != null) {
+                        try {
+                            // Send an empty key-up report (all zeros = no keys pressed)
+                            val emptyReport = HidKeyMapper.createKeyUpReport()
+                            val sent = hid.sendReport(device, 0, emptyReport)
+                            log("D", "Keep-alive sent: $sent")
+                        } catch (e: Exception) {
+                            log("W", "Keep-alive failed: ${e.message}")
+                        }
+                    }
+                    mainHandler.postDelayed(this, KEEP_ALIVE_INTERVAL_MS)
+                } else {
+                    log("D", "Keep-alive stopped (no longer connected)")
+                }
+            }
+        }
+        mainHandler.postDelayed(keepAliveRunnable!!, KEEP_ALIVE_INTERVAL_MS)
+    }
+
+    private fun stopKeepAlive() {
+        keepAliveRunnable?.let {
+            mainHandler.removeCallbacks(it)
+            log("D", "Keep-alive stopped")
+        }
+        keepAliveRunnable = null
+    }
 
     // ============================================================
     // Key Sending
@@ -742,9 +789,21 @@ class BluetoothHidService(private val context: Context) {
         if (!isConnected) return
         keyExecutor.execute {
             for (char in text) {
-                val keyEvent = HidKeyMapper.charToHidKeyEvent(char) ?: continue
-                sendHidReportSync(keyEvent)
-                Thread.sleep(KEY_SEQUENCE_DELAY_MS)
+                if (char == '\n') {
+                    // Use the Enter setting for newlines in text
+                    val hid = hidDevice ?: return@execute
+                    val device = connectedDevice ?: return@execute
+                    val report = if (useShiftEnter) HidKeyMapper.createShiftEnterReport()
+                                 else HidKeyMapper.createEnterReport()
+                    hid.sendReport(device, 0, report)
+                    Thread.sleep(KEY_PRESS_DELAY_MS)
+                    hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
+                    Thread.sleep(KEY_SEQUENCE_DELAY_MS)
+                } else {
+                    val keyEvent = HidKeyMapper.charToHidKeyEvent(char) ?: continue
+                    sendHidReportSync(keyEvent)
+                    Thread.sleep(KEY_SEQUENCE_DELAY_MS)
+                }
             }
         }
     }
@@ -755,7 +814,9 @@ class BluetoothHidService(private val context: Context) {
         val device = connectedDevice ?: return false
         keyExecutor.execute {
             try {
-                hid.sendReport(device, 0, HidKeyMapper.createEnterReport())
+                val report = if (useShiftEnter) HidKeyMapper.createShiftEnterReport()
+                             else HidKeyMapper.createEnterReport()
+                hid.sendReport(device, 0, report)
                 Thread.sleep(KEY_PRESS_DELAY_MS)
                 hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
             } catch (e: Exception) { log("E", "sendEnter error: ${e.message}") }
@@ -804,8 +865,19 @@ class BluetoothHidService(private val context: Context) {
     fun cleanup() {
         log("I", "cleanup() called")
         isCleaningUp = true
+
+        // Remove ALL pending callbacks to prevent zombie re-register loops
+        // (critical during theme changes which recreate the Activity)
+        mainHandler.removeCallbacksAndMessages(null)
+
+        stopKeepAlive()
         cancelConnectionTimeout()
         cancelRegisterTimeout()
+
+        // Detach listeners so dead Activity doesn't get callbacks
+        onConnectionStateChanged = null
+        onDetailedStatus = null
+
         try {
             hidDevice?.let { hid ->
                 connectedDevice?.let { hid.disconnect(it) }
@@ -818,7 +890,8 @@ class BluetoothHidService(private val context: Context) {
         isRegistered = false
         isConnected = false
         pendingConnectDevice = null
-        isCleaningUp = false
+        // NOTE: isCleaningUp stays true — this instance is being destroyed.
+        // A new BluetoothHidService will be created by the new Activity.
     }
 
     data class ConnectResult(val accepted: Boolean, val message: String)

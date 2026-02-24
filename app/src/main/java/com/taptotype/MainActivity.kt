@@ -15,6 +15,7 @@ import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.widget.*
+import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -28,6 +29,7 @@ class MainActivity : AppCompatActivity() {
         private const val DISCOVERABLE_DURATION = 120
         private const val PREFS_NAME = "TapToTypePrefs"
         private const val PREF_THEME_MODE = "theme_mode"
+        private const val PREF_SHIFT_ENTER = "enter_is_shift"
     }
 
     private lateinit var hidService: BluetoothHidService
@@ -36,8 +38,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var statusIndicator: View
     private lateinit var statusText: TextView
     private lateinit var inputField: EditText
-    private lateinit var modeToggle: Switch
-    private lateinit var modeLabel: TextView
+    private lateinit var modeSpinner: Spinner
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
     private lateinit var setupHelpButton: Button
@@ -139,8 +140,7 @@ class MainActivity : AppCompatActivity() {
         statusIndicator = findViewById(R.id.statusIndicator)
         statusText = findViewById(R.id.statusText)
         inputField = findViewById(R.id.inputField)
-        modeToggle = findViewById(R.id.modeToggle)
-        modeLabel = findViewById(R.id.modeLabel)
+        modeSpinner = findViewById(R.id.modeSpinner)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
         setupHelpButton = findViewById(R.id.setupHelpButton)
@@ -149,6 +149,8 @@ class MainActivity : AppCompatActivity() {
         deviceListLabel = findViewById(R.id.deviceListLabel)
 
         hidService = BluetoothHidService(this)
+        hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getBoolean(PREF_SHIFT_ENTER, false)
         setupUI()
         checkPermissions()
     }
@@ -200,11 +202,18 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        modeToggle.isChecked = true
-        updateModeUI(true)
-        modeToggle.setOnCheckedChangeListener { _, isChecked ->
-            isLiveMode = isChecked
-            updateModeUI(isChecked)
+        // Mode spinner setup
+        val modeOptions = arrayOf("⌨️  Live Typing", "📤  Type & Send")
+        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modeOptions)
+        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        modeSpinner.adapter = spinnerAdapter
+        modeSpinner.setSelection(0) // Default: Live Typing
+        modeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                isLiveMode = (position == 0)
+                updateModeUI(isLiveMode)
+            }
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
 
         sendButton.setOnClickListener {
@@ -212,7 +221,9 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 if (hidService.isConnected) {
                     hidService.sendString(text)
-                    Toast.makeText(this, "Sent: ${text.take(30)}${if (text.length > 30) "..." else ""}", Toast.LENGTH_SHORT).show()
+                    inputField.text.clear()
+                    previousText = ""
+                    Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Not connected to any device", Toast.LENGTH_SHORT).show()
                 }
@@ -240,21 +251,30 @@ class MainActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                if (!isLiveMode || !hidService.isConnected) return
+                if (!hidService.isConnected) {
+                    previousText = s?.toString() ?: ""
+                    return
+                }
+
                 val currentText = s?.toString() ?: ""
+
+                // Backspace works in BOTH modes
                 if (currentText.length < previousText.length) {
                     val deletedCount = previousText.length - currentText.length
                     repeat(deletedCount) { hidService.sendBackspace() }
-                } else if (currentText.length > previousText.length) {
+                } else if (isLiveMode && currentText.length > previousText.length) {
+                    // Live mode: send new characters immediately
                     val newChars = currentText.substring(previousText.length)
                     for (char in newChars) { hidService.sendKeyPress(char) }
                 }
+
                 previousText = currentText
             }
         })
 
+        // Enter key works in both modes
         inputField.setOnKeyListener { _, keyCode, event ->
-            if (isLiveMode && keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
+            if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
                 if (hidService.isConnected) hidService.sendEnter()
                 false
             } else false
@@ -264,13 +284,11 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun updateModeUI(isLive: Boolean) {
         if (isLive) {
-            modeLabel.text = "Mode: Live Input"
             sendButton.visibility = View.GONE
             inputField.hint = "Start typing — keystrokes sent live..."
         } else {
-            modeLabel.text = "Mode: Send Button"
             sendButton.visibility = View.VISIBLE
-            inputField.hint = "Type your message here..."
+            inputField.hint = "Type your message, then tap Send..."
         }
     }
 
@@ -296,8 +314,11 @@ class MainActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val currentTheme = prefs.getInt(PREF_THEME_MODE, 0)
 
+        val enterLabel = if (hidService.useShiftEnter) "Shift+Enter (line break)" else "Enter (submit)"
+
         val items = mutableListOf<String>()
         items.add("🎨  Theme: ${when(currentTheme) { 0 -> "Light ☀️"; 1 -> "Dark 🌙"; else -> "System 🔄" }}")
+        items.add("↵  Enter key: $enterLabel")
         if (hidService.isConnected) items.add("⚡  Disconnect from PC")
         if (!hidService.isRegistered) items.add("🔁  Retry HID Registration")
         items.add("🔄  Re-initialize Bluetooth")
@@ -311,6 +332,8 @@ class MainActivity : AppCompatActivity() {
                 when (which) {
                     0 -> showThemeSelector()
                     else -> {
+                        if (which == idx) { showEnterKeySelector(); return@setItems }
+                        idx++
                         if (hidService.isConnected && which == idx) { confirmDisconnect(); return@setItems }
                         if (hidService.isConnected) idx++
                         if (!hidService.isRegistered && which == idx) {
@@ -338,6 +361,32 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Choose Theme")
             .setSingleChoiceItems(arrayOf("☀️  Light", "🌙  Dark", "🔄  Follow System"), currentTheme) { dialog, which ->
                 setThemeMode(which)
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showEnterKeySelector() {
+        val currentChoice = if (hidService.useShiftEnter) 1 else 0
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("Enter Key Behavior")
+            .setSingleChoiceItems(
+                arrayOf(
+                    "↵  Enter (submit / confirm)",
+                    "⇧↵  Shift+Enter (line break)"
+                ),
+                currentChoice
+            ) { dialog, which ->
+                val useShift = (which == 1)
+                hidService.useShiftEnter = useShift
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit().putBoolean(PREF_SHIFT_ENTER, useShift).apply()
+                Toast.makeText(
+                    this,
+                    if (useShift) "Enter → Shift+Enter (line break)" else "Enter → Enter (submit)",
+                    Toast.LENGTH_SHORT
+                ).show()
                 dialog.dismiss()
             }
             .setNegativeButton("Cancel", null)

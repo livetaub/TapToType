@@ -254,4 +254,16 @@ object HidKeyMapper {
             0x00, 0x00, 0x00, 0x00, 0x00
         )
     }
+
+    /**
+     * Creates a Shift+Enter key-down report (line break in chat apps).
+     */
+    fun createShiftEnterReport(): ByteArray {
+        return byteArrayOf(
+            MOD_LEFT_SHIFT,
+            0x00,
+            KEY_ENTER,
+            0x00, 0x00, 0x00, 0x00, 0x00
+        )
+    }
 }
