@@ -256,7 +256,7 @@ class MainActivity : AppCompatActivity() {
                 if (hidService.isConnected) {
                     hidService.sendString(text)
                     ignoreTextChanges = true
-                    inputField.text.clear()
+                    inputField.text?.clear()
                     previousText = ""
                     ignoreTextChanges = false
                     Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
@@ -268,7 +268,7 @@ class MainActivity : AppCompatActivity() {
 
         clearButton.setOnClickListener {
             ignoreTextChanges = true
-            inputField.text.clear()
+            inputField.text?.clear()
             previousText = ""
             ignoreTextChanges = false
         }
