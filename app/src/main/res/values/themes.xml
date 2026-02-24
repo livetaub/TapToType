@@ -18,7 +18,7 @@
     </style>
 
     <!-- Primary action button -->
-    <style name="PrimaryButton" parent="Widget.MaterialComponents.Button">
+    <style name="PrimaryButton" parent="Widget.AppCompat.Button.Borderless">
         <item name="android:background">@drawable/button_primary_bg</item>
         <item name="android:textColor">@android:color/white</item>
         <item name="android:textSize">14sp</item>
@@ -30,7 +30,7 @@
     </style>
 
     <!-- Secondary / outline button -->
-    <style name="SecondaryButton" parent="Widget.MaterialComponents.Button">
+    <style name="SecondaryButton" parent="Widget.AppCompat.Button.Borderless">
         <item name="android:background">@drawable/button_secondary_bg</item>
         <item name="android:textColor">@color/button_secondary_text</item>
         <item name="android:textSize">14sp</item>
