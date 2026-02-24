@@ -4,29 +4,31 @@
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@color/surface"
-    android:padding="24dp">
+    android:padding="28dp">
 
     <!-- Title -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="📡  Connect to your PC"
-        android:textSize="22sp"
+        android:text="Connect to your PC"
+        android:textSize="24sp"
         android:textColor="@color/text_primary"
         android:textStyle="bold"
         android:fontFamily="sans-serif-medium"
+        android:letterSpacing="-0.02"
         android:gravity="center"
-        android:layout_marginBottom="8dp" />
+        android:layout_marginBottom="6dp" />
 
     <!-- Subtitle -->
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Follow these steps to pair and connect"
-        android:textSize="14sp"
+        android:textSize="15sp"
         android:textColor="@color/text_secondary"
         android:gravity="center"
-        android:layout_marginBottom="20dp" />
+        android:lineSpacingExtra="2dp"
+        android:layout_marginBottom="28dp" />
 
     <!-- Step Progress Indicators -->
     <LinearLayout
@@ -34,80 +36,81 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center"
-        android:layout_marginBottom="24dp">
+        android:layout_marginBottom="28dp">
 
         <View
             android:id="@+id/wizardDot1"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
             android:background="@drawable/wizard_dot_inactive" />
 
         <View
-            android:layout_width="32dp"
+            android:layout_width="28dp"
             android:layout_height="2dp"
             android:background="@color/divider"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp" />
 
         <View
             android:id="@+id/wizardDot2"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
             android:background="@drawable/wizard_dot_inactive" />
 
         <View
-            android:layout_width="32dp"
+            android:layout_width="28dp"
             android:layout_height="2dp"
             android:background="@color/divider"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp" />
 
         <View
             android:id="@+id/wizardDot3"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
             android:background="@drawable/wizard_dot_inactive" />
 
         <View
-            android:layout_width="32dp"
+            android:layout_width="28dp"
             android:layout_height="2dp"
             android:background="@color/divider"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp" />
 
         <View
             android:id="@+id/wizardDot4"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
             android:background="@drawable/wizard_dot_inactive" />
 
         <View
-            android:layout_width="32dp"
+            android:layout_width="28dp"
             android:layout_height="2dp"
             android:background="@color/divider"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="4dp" />
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp" />
 
         <View
             android:id="@+id/wizardDot5"
-            android:layout_width="10dp"
-            android:layout_height="10dp"
+            android:layout_width="12dp"
+            android:layout_height="12dp"
             android:background="@drawable/wizard_dot_inactive" />
     </LinearLayout>
 
     <!-- Step Number Badge -->
     <TextView
         android:id="@+id/wizardStepBadge"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:text="1"
         android:textSize="18sp"
         android:textColor="@android:color/white"
         android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
         android:gravity="center"
         android:background="@drawable/step_badge_bg"
         android:layout_gravity="center"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="20dp" />
 
     <!-- Step Title -->
     <TextView
@@ -115,9 +118,11 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Enable Bluetooth"
-        android:textSize="18sp"
+        android:textSize="20sp"
         android:textColor="@color/text_primary"
         android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="-0.01"
         android:gravity="center"
         android:layout_marginBottom="12dp" />
 
@@ -130,7 +135,7 @@
         android:textSize="15sp"
         android:textColor="@color/text_secondary"
         android:gravity="center"
-        android:lineSpacingExtra="4dp"
+        android:lineSpacingExtra="5dp"
         android:layout_marginBottom="8dp" />
 
     <!-- Step Hint -->
@@ -142,8 +147,8 @@
         android:textSize="13sp"
         android:textColor="@color/text_tertiary"
         android:gravity="center"
-        android:lineSpacingExtra="2dp"
-        android:layout_marginBottom="16dp" />
+        android:lineSpacingExtra="3dp"
+        android:layout_marginBottom="20dp" />
 
     <!-- Status indicator for auto-detectable steps -->
     <LinearLayout
@@ -153,33 +158,37 @@
         android:orientation="horizontal"
         android:gravity="center"
         android:visibility="gone"
-        android:layout_marginBottom="12dp">
+        android:background="@drawable/card_background"
+        android:padding="14dp"
+        android:layout_marginBottom="16dp">
 
         <View
             android:id="@+id/wizardStatusDot"
             android:layout_width="10dp"
             android:layout_height="10dp"
             android:background="@drawable/status_disconnected"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="10dp" />
 
         <TextView
             android:id="@+id/wizardStatusLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="Not detected"
-            android:textSize="13sp"
-            android:textColor="@color/text_tertiary" />
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 
-    <!-- Step Action Button (Make Discoverable, Connect, etc.) -->
+    <!-- Step Action Button -->
     <Button
         android:id="@+id/wizardActionButton"
         style="@style/SecondaryButton"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="52dp"
         android:text="Action"
+        android:textSize="15sp"
         android:visibility="gone"
-        android:layout_marginBottom="16dp" />
+        android:layout_marginBottom="20dp" />
 
     <!-- Navigation Buttons -->
     <LinearLayout
@@ -192,20 +201,22 @@
             android:id="@+id/wizardBackButton"
             style="@style/SecondaryButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:text="Back"
+            android:textSize="15sp"
             android:visibility="gone"
-            android:layout_marginEnd="8dp" />
+            android:layout_marginEnd="10dp" />
 
         <Button
             android:id="@+id/wizardNextButton"
             style="@style/PrimaryButton"
             android:layout_width="0dp"
-            android:layout_height="48dp"
+            android:layout_height="52dp"
             android:layout_weight="1"
             android:text="Next"
-            android:layout_marginStart="8dp" />
+            android:textSize="15sp"
+            android:layout_marginStart="10dp" />
     </LinearLayout>
 
     <!-- Dismiss -->
@@ -216,8 +227,9 @@
         android:text="I'll do this later"
         android:textSize="14sp"
         android:textColor="@color/text_tertiary"
+        android:fontFamily="sans-serif-medium"
         android:gravity="center"
-        android:paddingTop="16dp"
+        android:paddingTop="20dp"
         android:paddingBottom="4dp" />
 
 </LinearLayout>

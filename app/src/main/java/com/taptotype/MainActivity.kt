@@ -15,6 +15,7 @@ import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.*
 import android.widget.ArrayAdapter
 import org.json.JSONArray
@@ -38,19 +39,26 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var hidService: BluetoothHidService
 
-    // UI elements
+    // UI elements — top bar
+    private lateinit var appTitleRow: LinearLayout
+    private lateinit var connectedBar: LinearLayout
     private lateinit var statusIndicator: View
     private lateinit var statusText: TextView
+    private lateinit var settingsButton: ImageButton
+    private lateinit var connectedMenuButton: ImageButton
+
+    // UI elements — disconnected state
+    private lateinit var disconnectedSection: LinearLayout
+    private lateinit var savedDevicesContainer: LinearLayout
+    private lateinit var addNewDeviceButton: Button
+    private lateinit var deviceListLabel: TextView
+
+    // UI elements — connected / typing state
+    private lateinit var typingSection: LinearLayout
     private lateinit var inputField: HidEditText
     private lateinit var modeSpinner: Spinner
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
-    private lateinit var addNewDeviceButton: Button
-    private lateinit var savedDevicesSection: LinearLayout
-    private lateinit var savedDevicesContainer: LinearLayout
-    private lateinit var disconnectButton: TextView
-    private lateinit var settingsButton: ImageButton
-    private lateinit var deviceListLabel: TextView
 
     private var isLiveMode: Boolean = true
     private var previousText: String = ""
@@ -134,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_CANCELED) {
             Toast.makeText(this, "Discoverable mode denied", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds ✅", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds", Toast.LENGTH_SHORT).show()
             refreshWizardStatus()
         }
     }
@@ -148,18 +156,26 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Top bar
+        appTitleRow = findViewById(R.id.appTitleRow)
+        connectedBar = findViewById(R.id.connectedBar)
         statusIndicator = findViewById(R.id.statusIndicator)
         statusText = findViewById(R.id.statusText)
+        settingsButton = findViewById(R.id.settingsButton)
+        connectedMenuButton = findViewById(R.id.connectedMenuButton)
+
+        // Disconnected state
+        disconnectedSection = findViewById(R.id.disconnectedSection)
+        savedDevicesContainer = findViewById(R.id.savedDevicesContainer)
+        addNewDeviceButton = findViewById(R.id.addNewDeviceButton)
+        deviceListLabel = findViewById(R.id.deviceListLabel)
+
+        // Connected / typing state
+        typingSection = findViewById(R.id.typingSection)
         inputField = findViewById(R.id.inputField)
         modeSpinner = findViewById(R.id.modeSpinner)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
-        addNewDeviceButton = findViewById(R.id.addNewDeviceButton)
-        savedDevicesSection = findViewById(R.id.savedDevicesSection)
-        savedDevicesContainer = findViewById(R.id.savedDevicesContainer)
-        disconnectButton = findViewById(R.id.disconnectButton)
-        settingsButton = findViewById(R.id.settingsButton)
-        deviceListLabel = findViewById(R.id.deviceListLabel)
 
         hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -237,7 +253,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Mode spinner setup
-        val modeOptions = arrayOf("⌨️  Live Typing", "📤  Type & Send")
+        val modeOptions = arrayOf("Live Typing", "Type & Send")
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modeOptions)
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         modeSpinner.adapter = spinnerAdapter
@@ -277,20 +293,26 @@ class MainActivity : AppCompatActivity() {
             showSetupWizard()
         }
 
-        disconnectButton.setOnClickListener {
-            confirmDisconnect()
-        }
-
         settingsButton.setOnClickListener {
             showSettingsDialog()
         }
 
-        // Scroll to input field when keyboard opens
-        inputField.setOnFocusChangeListener { view, hasFocus ->
+        // Connected state: ellipsis menu
+        connectedMenuButton.setOnClickListener {
+            showConnectedMenu()
+        }
+
+        // Focus state background + scroll to expose action buttons
+        inputField.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                view.postDelayed({
-                    view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height))
+                inputField.setBackgroundResource(R.drawable.input_background_focused)
+                clearButton.postDelayed({
+                    clearButton.requestRectangleOnScreen(
+                        android.graphics.Rect(0, 0, clearButton.width, clearButton.height)
+                    )
                 }, 300)
+            } else {
+                inputField.setBackgroundResource(R.drawable.input_background)
             }
         }
 
@@ -337,11 +359,7 @@ class MainActivity : AppCompatActivity() {
         val connDevice = hidService.getConnectedDevice()
         @SuppressLint("MissingPermission")
         val connName = connDevice?.name ?: connDevice?.address ?: ""
-        val currentStatus = when {
-            hidService.isConnected -> "Connected as Keyboard to $connName"
-            hidService.isRegistered -> "Ready — Tap 'Connect to Device'"
-            else -> "Not Connected"
-        }
+        val currentStatus = if (hidService.isRegistered) "Ready" else "Not connected"
         updateConnectionStatus(hidService.isConnected, currentStatus)
     }
 
@@ -349,11 +367,11 @@ class MainActivity : AppCompatActivity() {
     private fun updateModeUI(isLive: Boolean) {
         if (isLive) {
             sendButton.visibility = View.GONE
-            inputField.hint = "Start typing — keystrokes sent live..."
+            inputField.hint = "Start typing — keystrokes sent live…"
             inputField.lockCursorToEnd = true
         } else {
             sendButton.visibility = View.VISIBLE
-            inputField.hint = "Type your message, then tap Send..."
+            inputField.hint = "Type your message, then tap Send…"
             inputField.lockCursorToEnd = false
         }
     }
@@ -367,20 +385,78 @@ class MainActivity : AppCompatActivity() {
             val savedDevice = getSavedDevices().find { it.macAddress == mac }
             val displayName = savedDevice?.name ?: device?.name ?: "PC"
 
-            statusText.text = "Connected to $displayName"
-            deviceListLabel.text = mac
+            statusText.text = displayName
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
-            savedDevicesSection.visibility = View.GONE
-            disconnectButton.visibility = View.VISIBLE
+
+            // Animated switch to connected state
+            fadeOutView(appTitleRow)
+            fadeOutView(settingsButton)
+            fadeOutView(disconnectedSection)
+            connectedBar.visibility = View.VISIBLE
+            connectedMenuButton.visibility = View.VISIBLE
+            typingSection.visibility = View.VISIBLE
+            fadeInView(connectedBar)
+            fadeInView(connectedMenuButton)
+            fadeInView(typingSection)
             wizardDialog?.dismiss()
         } else {
-            statusText.text = status
-            statusIndicator.setBackgroundResource(R.drawable.status_disconnected)
-            savedDevicesSection.visibility = View.VISIBLE
-            disconnectButton.visibility = View.GONE
+            // Animated switch to disconnected state
+            fadeOutView(connectedBar)
+            fadeOutView(connectedMenuButton)
+            fadeOutView(typingSection)
+            appTitleRow.visibility = View.VISIBLE
+            settingsButton.visibility = View.VISIBLE
+            disconnectedSection.visibility = View.VISIBLE
+            fadeInView(appTitleRow)
+            fadeInView(settingsButton)
+            fadeInView(disconnectedSection)
+
+            deviceListLabel.text = status
             hasPromptedSave = false
             refreshSavedDevicesUI()
         }
+    }
+
+    /** Fade out a view and set it to GONE when complete. */
+    private fun fadeOutView(view: View, duration: Long = 200L) {
+        if (view.visibility == View.GONE) return
+        view.animate()
+            .alpha(0f)
+            .setDuration(duration)
+            .setInterpolator(DecelerateInterpolator())
+            .withEndAction {
+                view.visibility = View.GONE
+                view.alpha = 1f // reset for next show
+            }
+            .start()
+    }
+
+    /** Fade in a view from invisible. */
+    private fun fadeInView(view: View, duration: Long = 250L) {
+        view.alpha = 0f
+        view.visibility = View.VISIBLE
+        view.animate()
+            .alpha(1f)
+            .setDuration(duration)
+            .setStartDelay(80L)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+    }
+
+    private fun showConnectedMenu() {
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setItems(arrayOf(
+                "Disconnect",
+                "Settings",
+                "Diagnostics"
+            )) { _, which ->
+                when (which) {
+                    0 -> confirmDisconnect()
+                    1 -> showSettingsDialog()
+                    2 -> showDiagnostics()
+                }
+            }
+            .show()
     }
 
     // ============================================================
@@ -394,16 +470,16 @@ class MainActivity : AppCompatActivity() {
         val enterLabel = if (hidService.useShiftEnter) "Shift+Enter (line break)" else "Enter (submit)"
 
         val items = mutableListOf<String>()
-        items.add("🎨  Theme: ${when(currentTheme) { 0 -> "Light ☀️"; 1 -> "Dark 🌙"; else -> "System 🔄" }}")
-        items.add("↵  Enter key: $enterLabel")
-        if (hidService.isConnected) items.add("⚡  Disconnect from PC")
-        if (!hidService.isRegistered) items.add("🔁  Retry HID Registration")
-        items.add("🔄  Re-initialize Bluetooth")
-        items.add("🔍  Show Diagnostics")
-        items.add("📋  View Logs")
+        items.add("Theme: ${when(currentTheme) { 0 -> "Light"; 1 -> "Dark"; else -> "System" }}")
+        items.add("Enter key: $enterLabel")
+        if (hidService.isConnected) items.add("Disconnect from PC")
+        if (!hidService.isRegistered) items.add("Retry HID Registration")
+        items.add("Re-initialize Bluetooth")
+        items.add("Show Diagnostics")
+        items.add("View Logs")
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("⚙️  Settings")
+            .setTitle("Settings")
             .setItems(items.toTypedArray()) { _, which ->
                 var idx = 1
                 when (which) {
@@ -436,7 +512,7 @@ class MainActivity : AppCompatActivity() {
         val currentTheme = prefs.getInt(PREF_THEME_MODE, 0)
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Choose Theme")
-            .setSingleChoiceItems(arrayOf("☀️  Light", "🌙  Dark", "🔄  Follow System"), currentTheme) { dialog, which ->
+            .setSingleChoiceItems(arrayOf("Light", "Dark", "Follow System"), currentTheme) { dialog, which ->
                 setThemeMode(which)
                 dialog.dismiss()
             }
@@ -450,8 +526,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Enter Key Behavior")
             .setSingleChoiceItems(
                 arrayOf(
-                    "↵  Enter (submit / confirm)",
-                    "⇧↵  Shift+Enter (line break)"
+                    "Enter (submit / confirm)",
+                    "Shift+Enter (line break)"
                 ),
                 currentChoice
             ) { dialog, which ->
@@ -496,17 +572,20 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("MissingPermission")
     private fun showDiagnostics() {
         val diagInfo = hidService.getDiagnosticInfo()
+        val scrollView = ScrollView(this)
         val tv = TextView(this).apply {
             text = diagInfo
-            setPadding(48, 32, 48, 32)
-            textSize = 12f
+            setPadding(56, 40, 56, 40)
+            textSize = 13f
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             setTextIsSelectable(true)
-            movementMethod = ScrollingMovementMethod()
+            setLineSpacing(6f, 1f)
         }
+        scrollView.addView(tv)
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("🔍  Diagnostics")
-            .setView(tv)
+            .setTitle("Diagnostics")
+            .setView(scrollView)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy") { _, _ ->
                 val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
@@ -522,18 +601,19 @@ class MainActivity : AppCompatActivity() {
         val scrollView = ScrollView(this)
         val tv = TextView(this).apply {
             text = logText
-            setPadding(48, 32, 48, 32)
-            textSize = 11f
-            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            setPadding(56, 40, 56, 40)
+            textSize = 12f
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setTextIsSelectable(true)
-            typeface = android.graphics.Typeface.MONOSPACE
+            typeface = Typeface.MONOSPACE
+            setLineSpacing(4f, 1f)
         }
         scrollView.addView(tv)
         // Scroll to bottom
         scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("📋  Connection Logs")
+            .setTitle("Connection Logs")
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy All") { _, _ ->
@@ -591,7 +671,7 @@ class MainActivity : AppCompatActivity() {
                 hint = "The app needs Bluetooth to communicate with your PC.",
                 canAutoDetect = true,
                 detectCheck = { hidService.bluetoothAdapter?.isEnabled == true },
-                detectLabel = { if (it) "✅ Bluetooth is ON" else "❌ Bluetooth is OFF" },
+                detectLabel = { if (it) "Bluetooth is on" else "Bluetooth is off" },
                 actionLabel = "Turn On Bluetooth",
                 actionCallback = {
                     val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -608,7 +688,7 @@ class MainActivity : AppCompatActivity() {
                         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
                     }
                 },
-                detectLabel = { if (it) "✅ All permissions granted" else "❌ Permissions needed" },
+                detectLabel = { if (it) "All permissions granted" else "Permissions needed" },
                 actionLabel = "Grant Permissions",
                 actionCallback = {
                     val missing = requiredPermissions.filter {
@@ -617,7 +697,7 @@ class MainActivity : AppCompatActivity() {
                     if (missing.isNotEmpty()) {
                         permissionLauncher.launch(missing.toTypedArray())
                     } else {
-                        Toast.makeText(this, "All permissions already granted ✅", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "All permissions already granted", Toast.LENGTH_SHORT).show()
                         refreshWizardStatus()
                     }
                 }
@@ -629,7 +709,7 @@ class MainActivity : AppCompatActivity() {
                 canAutoDetect = false,
                 detectCheck = { true },
                 detectLabel = { "" },
-                actionLabel = "📡  Make Discoverable",
+                actionLabel = "Make Discoverable",
                 actionCallback = {
                     requestDiscoverableMode()
                 }
@@ -648,7 +728,7 @@ class MainActivity : AppCompatActivity() {
                         "The phone must advertise as a keyboard during pairing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.getPairedDevices().isNotEmpty() },
-                detectLabel = { if (it) "✅ Paired device(s) found" else "⏳ Waiting — pair from your PC" },
+                detectLabel = { if (it) "Paired device(s) found" else "Waiting — pair from your PC" },
                 actionLabel = "Open Bluetooth Settings (to unpair)",
                 actionCallback = {
                     try {
@@ -665,8 +745,8 @@ class MainActivity : AppCompatActivity() {
                 hint = "Once connected, click any text field on your PC and start typing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.isConnected },
-                detectLabel = { if (it) "✅ Connected!" else "⏳ Not connected yet" },
-                actionLabel = "🔗  Connect to Device",
+                detectLabel = { if (it) "Connected!" else "Not connected yet" },
+                actionLabel = "Connect to Device",
                 actionCallback = {
                     showDeviceSelectionDialog()
                 }
@@ -719,7 +799,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             backButton.visibility = if (wizardCurrentStep > 0) View.VISIBLE else View.GONE
-            nextButton.text = if (wizardCurrentStep == steps.size - 1) "Done ✅" else "Next →"
+            nextButton.text = if (wizardCurrentStep == steps.size - 1) "Done" else "Next"
         }
 
         // Action button click — delegates to the current step's callback
@@ -949,13 +1029,14 @@ class MainActivity : AppCompatActivity() {
             hint = "e.g. My Desktop, Work PC"
             setText(btName)
             selectAll()
-            setPadding(60, 40, 60, 40)
+            setPadding(60, 48, 60, 48)
             textSize = 16f
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            setBackgroundResource(R.drawable.input_background)
         }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("✅ Connected! Save this device?")
+            .setTitle("Connected! Save this device?")
             .setMessage("Give this PC a name for quick reconnecting:")
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
@@ -963,7 +1044,7 @@ class MainActivity : AppCompatActivity() {
                 val devices = getSavedDevices()
                 devices.add(SavedDevice(customName, mac, btName))
                 saveSavedDevices(devices)
-                Toast.makeText(this, "Saved \"$customName\" ✅", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Saved \"$customName\"", Toast.LENGTH_SHORT).show()
                 refreshSavedDevicesUI()
             }
             .setNegativeButton("Skip", null)
@@ -978,12 +1059,13 @@ class MainActivity : AppCompatActivity() {
         if (saved.isEmpty()) {
             // Show a hint when no devices saved
             val hint = TextView(this).apply {
-                text = "No saved devices yet.\nTap \"Set Up New Device\" to pair your PC."
+                text = "No saved devices yet\nTap below to set up your first connection"
                 textSize = 14f
                 typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-                setTextColor(resources.getColor(R.color.text_secondary, theme))
+                setTextColor(resources.getColor(R.color.text_tertiary, theme))
                 gravity = android.view.Gravity.CENTER
-                setPadding(0, 24, 0, 24)
+                setLineSpacing(8f, 1f)
+                setPadding(0, 48, 0, 48)
             }
             savedDevicesContainer.addView(hint)
             return
@@ -994,13 +1076,24 @@ class MainActivity : AppCompatActivity() {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
                 setBackgroundResource(R.drawable.card_background)
-                setPadding(40, 32, 40, 32)
+                setPadding(48, 40, 48, 40)
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                params.bottomMargin = 16
+                params.bottomMargin = 20
                 layoutParams = params
+            }
+
+            // Computer icon
+            val iconSizePx = (36 * resources.displayMetrics.density).toInt()
+            val iconMarginPx = (16 * resources.displayMetrics.density).toInt()
+            val deviceIcon = ImageView(this).apply {
+                setImageResource(R.drawable.ic_computer)
+                val iconParams = LinearLayout.LayoutParams(iconSizePx, iconSizePx)
+                iconParams.marginEnd = iconMarginPx
+                layoutParams = iconParams
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
             }
 
             // Device info column
@@ -1010,35 +1103,40 @@ class MainActivity : AppCompatActivity() {
             }
 
             val nameView = TextView(this).apply {
-                text = "💻  ${device.name}"
-                textSize = 16f
+                text = device.name
+                textSize = 17f
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setTextColor(resources.getColor(R.color.text_primary, theme))
             }
 
             val addrView = TextView(this).apply {
                 text = device.macAddress
-                textSize = 12f
+                textSize = 13f
                 typeface = Typeface.create("sans-serif", Typeface.NORMAL)
                 setTextColor(resources.getColor(R.color.text_tertiary, theme))
+                setPadding(0, 6, 0, 0)
             }
 
             infoCol.addView(nameView)
             infoCol.addView(addrView)
 
+            card.addView(deviceIcon)
+
             // Connect button
             val connectBtn = Button(this).apply {
                 text = "Connect"
-                textSize = 13f
+                textSize = 14f
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setBackgroundResource(R.drawable.button_primary_bg)
                 setTextColor(android.graphics.Color.WHITE)
-                setPadding(32, 16, 32, 16)
+                isAllCaps = false
+                setPadding(48, 20, 48, 20)
+                stateListAnimator = null
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                params.marginStart = 16
+                params.marginStart = 20
                 layoutParams = params
             }
 
@@ -1064,7 +1162,7 @@ class MainActivity : AppCompatActivity() {
         val btDevice = hidService.getPairedDevices().find { it.address == device.macAddress }
         if (btDevice == null) {
             AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("⚠️ Device Not Found")
+                .setTitle("Device Not Found")
                 .setMessage("\"${device.name}\" (${device.macAddress}) is not currently paired.\n\n" +
                         "You may need to re-pair it from your PC's Bluetooth settings.")
                 .setPositiveButton("Open Setup Wizard") { _, _ -> showSetupWizard() }
@@ -1102,7 +1200,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSavedDeviceOptions(device: SavedDevice) {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle(device.name)
-            .setItems(arrayOf("✏️ Rename", "🗑️ Remove")) { _, which ->
+            .setItems(arrayOf("Rename", "Remove")) { _, which ->
                 when (which) {
                     0 -> renameSavedDevice(device)
                     1 -> removeSavedDevice(device)
@@ -1116,8 +1214,10 @@ class MainActivity : AppCompatActivity() {
         val input = EditText(this).apply {
             setText(device.name)
             selectAll()
-            setPadding(60, 40, 60, 40)
+            setPadding(60, 48, 60, 48)
             textSize = 16f
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+            setBackgroundResource(R.drawable.input_background)
         }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
@@ -1163,7 +1263,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showErrorDialog(title: String, message: String) {
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("⚠️  $title")
+            .setTitle(title)
             .setMessage(message)
             .setPositiveButton("OK", null)
             .setNeutralButton("Diagnostics") { _, _ -> showDiagnostics() }

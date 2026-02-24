@@ -11,197 +11,254 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="16dp"
+        android:paddingBottom="24dp">
 
-        <!-- ========== Top Bar: Title + Settings ========== -->
+        <!-- ==========================================
+             TOP BAR: Always visible
+             ========================================== -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="56dp"
             android:orientation="horizontal"
             android:gravity="center_vertical"
             android:layout_marginBottom="8dp">
 
-            <View
-                android:layout_width="40dp"
-                android:layout_height="1dp" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="⌨️ TapToType"
-                android:textSize="28sp"
-                android:textColor="@color/text_primary"
-                android:textStyle="bold"
-                android:fontFamily="sans-serif-medium"
-                android:gravity="center" />
-
-            <ImageButton
-                android:id="@+id/settingsButton"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@drawable/ic_settings"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:scaleType="centerInside"
-                android:contentDescription="Settings"
-                android:padding="8dp" />
-        </LinearLayout>
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Turn your phone into a Bluetooth keyboard"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:fontFamily="sans-serif"
-            android:gravity="center"
-            android:layout_marginBottom="20dp" />
-
-        <!-- ========== Connection Status Bar ========== -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="@drawable/card_background"
-            android:padding="12dp"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
-
-            <View
-                android:id="@+id/statusIndicator"
-                android:layout_width="10dp"
-                android:layout_height="10dp"
-                android:background="@drawable/status_disconnected"
-                android:layout_marginEnd="10dp" />
-
+            <!-- App title (shown when NOT connected) -->
             <LinearLayout
+                android:id="@+id/appTitleRow"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical">
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
+                    android:src="@drawable/ic_logo_inline"
+                    android:contentDescription="TapToType"
+                    android:layout_marginEnd="10dp" />
+
+                <TextView
+                    android:id="@+id/appTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="TapToType"
+                    android:textSize="22sp"
+                    android:textColor="@color/text_primary"
+                    android:textStyle="bold"
+                    android:fontFamily="sans-serif-medium"
+                    android:letterSpacing="-0.02" />
+            </LinearLayout>
+
+            <!-- Connected bar (shown when connected) -->
+            <LinearLayout
+                android:id="@+id/connectedBar"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <View
+                    android:id="@+id/statusIndicator"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:background="@drawable/status_connected"
+                    android:layout_marginEnd="10dp" />
 
                 <TextView
                     android:id="@+id/statusText"
-                    android:layout_width="match_parent"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Not Connected"
-                    android:textSize="14sp"
+                    android:layout_weight="1"
+                    android:text=""
+                    android:textSize="16sp"
                     android:textColor="@color/text_primary"
                     android:fontFamily="sans-serif-medium"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
-
-                <TextView
-                    android:id="@+id/deviceListLabel"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textSize="11sp"
-                    android:fontFamily="sans-serif"
-                    android:textColor="@color/text_tertiary"
+                    android:letterSpacing="-0.01"
                     android:singleLine="true"
                     android:ellipsize="end" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/disconnectButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Disconnect"
-                android:textSize="12sp"
-                android:textColor="@color/error"
-                android:fontFamily="sans-serif-medium"
-                android:visibility="gone"
-                android:padding="8dp"
-                android:background="?attr/selectableItemBackgroundBorderless" />
+            <!-- Settings button (shown when NOT connected) -->
+            <ImageButton
+                android:id="@+id/settingsButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_settings"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
+                android:contentDescription="Settings"
+                android:padding="10dp" />
+
+            <!-- Ellipsis menu (shown when connected) -->
+            <ImageButton
+                android:id="@+id/connectedMenuButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:src="@drawable/ic_more_vert"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:scaleType="centerInside"
+                android:contentDescription="Menu"
+                android:padding="10dp"
+                android:visibility="gone" />
         </LinearLayout>
 
-        <!-- ========== Saved Devices Section (when NOT connected) ========== -->
+        <!-- ==========================================
+             DISCONNECTED STATE
+             ========================================== -->
         <LinearLayout
-            android:id="@+id/savedDevicesSection"
+            android:id="@+id/disconnectedSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:layout_marginBottom="12dp">
+            android:orientation="vertical">
 
-            <!-- Saved device cards inserted dynamically here -->
+            <!-- Tagline -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Turn your phone into a Bluetooth keyboard"
+                android:textSize="15sp"
+                android:textColor="@color/text_secondary"
+                android:fontFamily="sans-serif"
+                android:gravity="center"
+                android:letterSpacing="0.01"
+                android:layout_marginBottom="28dp" />
+
+            <!-- Status info card -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:background="@drawable/card_background"
+                android:padding="16dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="20dp">
+
+                <View
+                    android:id="@+id/disconnectedDot"
+                    android:layout_width="10dp"
+                    android:layout_height="10dp"
+                    android:background="@drawable/status_disconnected"
+                    android:layout_marginEnd="12dp" />
+
+                <TextView
+                    android:id="@+id/deviceListLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Not connected"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="sans-serif" />
+            </LinearLayout>
+
+            <!-- Saved device cards -->
             <LinearLayout
                 android:id="@+id/savedDevicesContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
+            <!-- Setup button -->
             <Button
                 android:id="@+id/addNewDeviceButton"
                 style="@style/PrimaryButton"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:text="＋  Set Up New Device"
-                android:textSize="15sp"
+                android:layout_height="56dp"
+                android:text="Set Up New Device"
+                android:textSize="16sp"
                 android:fontFamily="sans-serif-medium"
-                android:layout_marginTop="8dp" />
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="32dp"
+                android:drawableStart="@drawable/ic_add"
+                android:drawablePadding="8dp" />
 
-        </LinearLayout>
-
-        <!-- ========== Mode Selector Card (Dropdown) ========== -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:background="@drawable/card_background"
-            android:padding="16dp"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="12dp">
-
-            <TextView
-                android:layout_width="wrap_content"
+            <!-- Connect prompt — Empty state -->
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Mode"
-                android:textSize="15sp"
-                android:textColor="@color/text_primary"
-                android:fontFamily="sans-serif-medium"
-                android:layout_marginEnd="16dp" />
+                android:orientation="vertical"
+                android:gravity="center"
+                android:paddingTop="48dp"
+                android:paddingBottom="48dp">
 
-            <Spinner
-                android:id="@+id/modeSpinner"
-                android:layout_width="0dp"
-                android:layout_height="44dp"
-                android:layout_weight="1"
-                android:background="@drawable/input_background"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:popupBackground="@color/surface"
-                android:fontFamily="sans-serif" />
+                <ImageView
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:src="@drawable/ic_link"
+                    android:contentDescription="Connect"
+                    android:alpha="0.5"
+                    android:layout_marginBottom="16dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Connect to a device to start typing"
+                    android:textSize="16sp"
+                    android:textColor="@color/text_tertiary"
+                    android:fontFamily="sans-serif"
+                    android:gravity="center"
+                    android:lineSpacingExtra="4dp" />
+            </LinearLayout>
+
         </LinearLayout>
 
-        <!-- ========== Text Input Card ========== -->
+        <!-- ==========================================
+             CONNECTED STATE — Typing UI
+             ========================================== -->
         <LinearLayout
+            android:id="@+id/typingSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:background="@drawable/card_background"
-            android:padding="16dp"
-            android:layout_marginBottom="12dp">
+            android:visibility="gone">
 
-            <TextView
-                android:id="@+id/inputLabel"
+            <!-- Mode Selector -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="KEYBOARD INPUT"
-                android:textSize="12sp"
-                android:textColor="@color/text_tertiary"
-                android:textAllCaps="true"
-                android:letterSpacing="0.08"
-                android:fontFamily="sans-serif-medium"
-                android:layout_marginBottom="8dp" />
+                android:orientation="horizontal"
+                android:background="@drawable/card_background"
+                android:padding="14dp"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="12dp">
 
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Mode"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginEnd="14dp" />
+
+                <Spinner
+                    android:id="@+id/modeSpinner"
+                    android:layout_width="0dp"
+                    android:layout_height="44dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/input_background"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:popupBackground="@color/surface"
+                    android:fontFamily="sans-serif" />
+            </LinearLayout>
+
+            <!-- Text Input -->
             <com.taptotype.HidEditText
                 android:id="@+id/inputField"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="180dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:minHeight="220dp"
                 android:background="@drawable/input_background"
-                android:padding="16dp"
+                android:padding="20dp"
                 android:textSize="17sp"
                 android:textColor="@color/text_primary"
                 android:textColorHint="@color/text_tertiary"
@@ -210,45 +267,41 @@
                 android:gravity="top|start"
                 android:inputType="textMultiLine"
                 android:importantForAutofill="no"
-                android:lineSpacingExtra="4dp"
+                android:lineSpacingExtra="6dp"
                 tools:ignore="LabelFor" />
+
+            <!-- Action Buttons -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:paddingTop="12dp">
+
+                <ImageButton
+                    android:id="@+id/sendButton"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:src="@drawable/ic_send"
+                    android:background="@drawable/button_primary_bg"
+                    android:scaleType="centerInside"
+                    android:contentDescription="Send"
+                    android:visibility="gone"
+                    android:layout_marginEnd="12dp"
+                    android:padding="16dp" />
+
+                <Button
+                    android:id="@+id/clearButton"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
+                    android:layout_height="56dp"
+                    android:layout_weight="1"
+                    android:text="Clear"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium" />
+            </LinearLayout>
+
         </LinearLayout>
-
-        <!-- ========== Action Buttons ========== -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center">
-
-            <ImageButton
-                android:id="@+id/sendButton"
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:src="@drawable/ic_send"
-                android:background="@drawable/button_primary_bg"
-                android:scaleType="centerInside"
-                android:contentDescription="Send"
-                android:visibility="gone"
-                android:layout_marginEnd="8dp"
-                android:padding="14dp" />
-
-            <Button
-                android:id="@+id/clearButton"
-                style="@style/SecondaryButton"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:text="✕  Clear"
-                android:textSize="16sp"
-                android:fontFamily="sans-serif-medium"
-                android:layout_marginStart="8dp" />
-        </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
 
     </LinearLayout>
 </ScrollView>

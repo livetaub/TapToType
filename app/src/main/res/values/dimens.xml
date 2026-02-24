@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ============================================
+         Spacing Scale — 4pt base
+         ============================================ -->
+    <dimen name="spacing_xs">4dp</dimen>
+    <dimen name="spacing_sm">8dp</dimen>
+    <dimen name="spacing_md">12dp</dimen>
+    <dimen name="spacing_base">16dp</dimen>
+    <dimen name="spacing_lg">20dp</dimen>
+    <dimen name="spacing_xl">24dp</dimen>
+    <dimen name="spacing_2xl">32dp</dimen>
+    <dimen name="spacing_3xl">48dp</dimen>
+
+    <!-- ============================================
+         Border Radius Scale
+         ============================================ -->
+    <dimen name="radius_sm">8dp</dimen>
+    <dimen name="radius_md">12dp</dimen>
+    <dimen name="radius_base">14dp</dimen>
+    <dimen name="radius_lg">20dp</dimen>
+    <dimen name="radius_xl">24dp</dimen>
+    <dimen name="radius_full">999dp</dimen>
+
+    <!-- ============================================
+         Component Heights
+         ============================================ -->
+    <dimen name="button_height_sm">40dp</dimen>
+    <dimen name="button_height_md">48dp</dimen>
+    <dimen name="button_height_lg">56dp</dimen>
+    <dimen name="top_bar_height">56dp</dimen>
+    <dimen name="icon_touch_target">44dp</dimen>
+
+    <!-- ============================================
+         Typography Scale
+         ============================================ -->
+    <dimen name="text_xs">12sp</dimen>
+    <dimen name="text_sm">13sp</dimen>
+    <dimen name="text_base">14sp</dimen>
+    <dimen name="text_md">15sp</dimen>
+    <dimen name="text_lg">16sp</dimen>
+    <dimen name="text_xl">17sp</dimen>
+    <dimen name="text_2xl">20sp</dimen>
+    <dimen name="text_3xl">22sp</dimen>
+    <dimen name="text_4xl">24sp</dimen>
+</resources>

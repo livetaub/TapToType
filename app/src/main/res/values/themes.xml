@@ -1,14 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <!-- App Theme - Follows system day/night, defaults to light -->
+    <!-- ============================================
+         App Theme — TapToType Design System v2
+         ============================================ -->
     <style name="Theme.TapToType" parent="Theme.MaterialComponents.DayNight.NoActionBar">
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryVariant">@color/accent_dark</item>
-        <item name="colorOnPrimary">@android:color/white</item>
+        <item name="colorOnPrimary">@color/text_on_accent</item>
         <item name="colorSecondary">@color/accent_light</item>
         <item name="colorSecondaryVariant">@color/accent_dark</item>
-        <item name="colorOnSecondary">@android:color/white</item>
+        <item name="colorOnSecondary">@color/text_on_accent</item>
         <item name="android:colorBackground">@color/background</item>
         <item name="colorSurface">@color/surface</item>
         <item name="colorOnSurface">@color/text_primary</item>
@@ -17,46 +19,74 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <!-- Primary action button -->
+    <!-- ============================================
+         Primary Button — Gradient feel, bold presence
+         ============================================ -->
     <style name="PrimaryButton" parent="Widget.AppCompat.Button.Borderless">
         <item name="android:background">@drawable/button_primary_bg</item>
-        <item name="android:textColor">@android:color/white</item>
-        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/text_on_accent</item>
+        <item name="android:textSize">15sp</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:letterSpacing">0.02</item>
+        <item name="android:letterSpacing">0.01</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="android:elevation">0dp</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
     </style>
 
-    <!-- Secondary / outline button -->
+    <!-- ============================================
+         Secondary Button — Subtle, outlined
+         ============================================ -->
     <style name="SecondaryButton" parent="Widget.AppCompat.Button.Borderless">
         <item name="android:background">@drawable/button_secondary_bg</item>
         <item name="android:textColor">@color/button_secondary_text</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:letterSpacing">0.01</item>
+        <item name="android:stateListAnimator">@null</item>
+        <item name="android:elevation">0dp</item>
+        <item name="android:paddingStart">24dp</item>
+        <item name="android:paddingEnd">24dp</item>
+    </style>
+
+    <!-- ============================================
+         Ghost Button — Text-only, minimal presence
+         ============================================ -->
+    <style name="GhostButton" parent="Widget.AppCompat.Button.Borderless">
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:textColor">@color/text_secondary</item>
         <item name="android:textSize">14sp</item>
         <item name="android:textAllCaps">false</item>
         <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:letterSpacing">0.02</item>
+        <item name="android:letterSpacing">0.01</item>
         <item name="android:stateListAnimator">@null</item>
         <item name="android:elevation">0dp</item>
     </style>
 
-    <!-- Dialog theme -->
+    <!-- ============================================
+         Dialog Theme — Refined overlays
+         ============================================ -->
     <style name="DialogTheme" parent="Theme.MaterialComponents.DayNight.Dialog.Alert">
         <item name="colorPrimary">@color/accent</item>
         <item name="android:background">@color/surface</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="dialogCornerRadius">20dp</item>
     </style>
 
-    <!-- Setup Wizard Dialog theme -->
+    <!-- ============================================
+         Setup Wizard Dialog — Premium bottom-sheet feel
+         ============================================ -->
     <style name="SetupWizardDialog" parent="Theme.MaterialComponents.DayNight.Dialog">
         <item name="colorPrimary">@color/accent</item>
         <item name="android:background">@color/surface</item>
         <item name="android:textColorPrimary">@color/text_primary</item>
         <item name="android:textColorSecondary">@color/text_secondary</item>
-        <item name="android:windowMinWidthMajor">90%</item>
-        <item name="android:windowMinWidthMinor">90%</item>
+        <item name="android:windowMinWidthMajor">92%</item>
+        <item name="android:windowMinWidthMinor">92%</item>
+        <item name="dialogCornerRadius">24dp</item>
     </style>
 
 </resources>

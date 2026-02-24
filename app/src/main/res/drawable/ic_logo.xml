@@ -6,19 +6,19 @@
     android:viewportHeight="108">
 
     <!--
-        TapToType Launcher Icon — Foreground Layer
-        Adaptive icon safe zone: 66dp centered in 108dp (21dp inset)
-        The key + T lettermark + ripple arcs
+        TapToType Logo — "The Keystroke"
+        A stylized keyboard key with a tap ripple emanating from it.
+        Represents the core action: tap on phone → type on PC.
     -->
 
     <group
         android:translateX="18"
         android:translateY="18">
 
-        <!-- Tap ripple ring (outer) -->
+        <!-- Tap ripple ring (outer) — represents the wireless signal / tap -->
         <path
             android:fillColor="#00000000"
-            android:strokeColor="#55FFFFFF"
+            android:strokeColor="#FF7E72FF"
             android:strokeWidth="2.5"
             android:pathData="M36,10 C50,10 58,20 58,30"
             android:strokeLineCap="round" />
@@ -26,34 +26,35 @@
         <!-- Tap ripple ring (inner) -->
         <path
             android:fillColor="#00000000"
-            android:strokeColor="#88FFFFFF"
+            android:strokeColor="#FF5B4CFF"
             android:strokeWidth="2.5"
             android:pathData="M36,18 C45,18 50,24 50,30"
             android:strokeLineCap="round" />
 
+        <!-- Main key body — rounded rectangle with gradient-like two-tone -->
         <!-- Key shadow/depth layer -->
         <path
-            android:fillColor="#FF3D2EB3"
+            android:fillColor="#FF3D30CC"
             android:pathData="M8,26 C8,22.69 10.69,20 14,20 L42,20 C45.31,20 48,22.69 48,26 L48,56 C48,59.31 45.31,62 42,62 L14,62 C10.69,62 8,59.31 8,56 Z" />
 
         <!-- Key top surface -->
         <path
-            android:fillColor="#FFFFFFFF"
+            android:fillColor="#FF5B4CFF"
             android:pathData="M8,24 C8,20.69 10.69,18 14,18 L42,18 C45.31,18 48,20.69 48,24 L48,54 C48,57.31 45.31,60 42,60 L14,60 C10.69,60 8,57.31 8,54 Z" />
 
-        <!-- Key top highlight band -->
+        <!-- Key top highlight (lighter band at top for 3D feel) -->
         <path
-            android:fillColor="#20000000"
-            android:pathData="M8,50 L48,50 L48,54 C48,57.31 45.31,60 42,60 L14,60 C10.69,60 8,57.31 8,54 Z" />
+            android:fillColor="#FF7E72FF"
+            android:pathData="M8,24 C8,20.69 10.69,18 14,18 L42,18 C45.31,18 48,20.69 48,24 L48,28 L8,28 Z" />
 
-        <!-- Letter "T" on the key -->
+        <!-- Letter "T" on the key — clean, bold -->
         <path
-            android:fillColor="#FF5B4CFF"
+            android:fillColor="#FFFFFFFF"
             android:pathData="M20,34 L36,34 L36,38 L30.5,38 L30.5,52 L25.5,52 L25.5,38 L20,38 Z" />
 
-        <!-- Tap dot -->
+        <!-- Small dot at bottom-right suggesting cursor / tap point -->
         <path
-            android:fillColor="#88FFFFFF"
+            android:fillColor="#FF7E72FF"
             android:pathData="M54,58 m-3,0 a3,3 0,1 1,6 0 a3,3 0,1 1,-6 0" />
 
     </group>
