@@ -992,7 +992,7 @@ class MainActivity : AppCompatActivity() {
                 textSize = 13f
                 typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setBackgroundResource(R.drawable.button_primary_bg)
-                setTextColor(resources.getColor(R.color.button_text, theme))
+                setTextColor(android.graphics.Color.WHITE)
                 setPadding(32, 16, 32, 16)
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
