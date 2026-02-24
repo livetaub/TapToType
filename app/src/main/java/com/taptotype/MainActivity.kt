@@ -325,9 +325,11 @@ class MainActivity : AppCompatActivity() {
         if (isLive) {
             sendButton.visibility = View.GONE
             inputField.hint = "Start typing — keystrokes sent live..."
+            inputField.lockCursorToEnd = true
         } else {
             sendButton.visibility = View.VISIBLE
             inputField.hint = "Type your message, then tap Send..."
+            inputField.lockCursorToEnd = false
         }
     }
 
