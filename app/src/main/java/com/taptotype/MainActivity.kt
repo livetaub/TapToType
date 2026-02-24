@@ -510,13 +510,28 @@ class MainActivity : AppCompatActivity() {
             ),
             WizardStep(
                 title = "Pair from Windows PC",
-                description = "On your Windows PC, go to:\n\nSettings → Bluetooth & Devices\n→ Add device → Bluetooth",
-                hint = "Select your phone from the list.\nAccept the pairing prompt on BOTH devices.",
+                description = "⚠️ IMPORTANT: The app must be open during pairing!\n\n" +
+                        "On your Windows PC:\n" +
+                        "1. Remove \"Pixel 10\" if already paired\n" +
+                        "2. Go to Settings → Bluetooth & Devices\n" +
+                        "3. Add device → Bluetooth\n" +
+                        "4. Select your phone and accept on BOTH devices",
+                hint = "If your phone shows under \"Other devices\" on the PC instead of " +
+                        "\"Mouse, keyboard, & pen\", you need to REMOVE it and re-pair " +
+                        "while this app is open.\n\n" +
+                        "The phone must advertise as a keyboard during pairing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.getPairedDevices().isNotEmpty() },
                 detectLabel = { if (it) "✅ Paired device(s) found" else "⏳ Waiting — pair from your PC" },
-                actionLabel = null,
-                actionCallback = null
+                actionLabel = "Open Bluetooth Settings (to unpair)",
+                actionCallback = {
+                    try {
+                        val intent = Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)
+                        startActivity(intent)
+                    } catch (e: Exception) {
+                        Toast.makeText(this, "Open Settings → Bluetooth manually", Toast.LENGTH_SHORT).show()
+                    }
+                }
             ),
             WizardStep(
                 title = "Connect to your PC",

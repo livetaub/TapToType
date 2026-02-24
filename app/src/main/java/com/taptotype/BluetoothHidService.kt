@@ -232,21 +232,31 @@ class BluetoothHidService(private val context: Context) {
                     postDetailedStatus("HID Keyboard unregistered (cleanup)")
                     notifyConnectionState()
                 } else {
-                    // UNEXPECTED unregistration — Android BT stack killed our registration
-                    // This typically happens ~20s after registerApp() if no device connects.
-                    // Fix: automatically re-register to stay alive.
-                    log("W", "⚠️ UNEXPECTED unregistration by system! Auto-re-registering...")
-                    postDetailedStatus("⚠️ System unregistered HID — re-registering automatically...")
+                    // UNEXPECTED unregistration — Android BT stack killed our registration.
+                    // This typically happens ~5-20s after registerApp() if no device connects.
+                    // The old proxy becomes STALE after this — registerApp() on it returns false.
+                    // Fix: get a completely fresh proxy via initialize().
+                    log("W", "⚠️ UNEXPECTED unregistration by system! Getting fresh proxy...")
+                    postDetailedStatus("⚠️ System unregistered HID — reinitializing...")
                     notifyConnectionState()
 
-                    // Re-register after a short delay
-                    registerRetryCount = 0
+                    // Close the stale proxy and get a fresh one
                     mainHandler.postDelayed({
-                        if (!isRegistered && hidDevice != null && !isCleaningUp) {
-                            log("I", "Auto-re-registering after unexpected unregistration...")
-                            doRegister()
+                        if (!isRegistered && !isCleaningUp) {
+                            log("I", "Getting fresh Bluetooth HID proxy after system unregistration...")
+                            // Close the old stale proxy
+                            try {
+                                bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HID_DEVICE, hidDevice)
+                                log("D", "Closed stale proxy")
+                            } catch (e: Exception) {
+                                log("W", "Error closing stale proxy: ${e.message}")
+                            }
+                            hidDevice = null
+                            registerRetryCount = 0
+                            // Get a completely new proxy — this triggers onServiceConnected → registerApp()
+                            initialize()
                         }
-                    }, 500)
+                    }, 1000)
                 }
             }
         }
