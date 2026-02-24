@@ -2,6 +2,7 @@ package com.taptotype
 
 import android.content.Context
 import android.util.AttributeSet
+import android.view.MotionEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputConnectionWrapper
@@ -10,7 +11,7 @@ import androidx.appcompat.widget.AppCompatEditText
 /**
  * Custom EditText that:
  * 1. Intercepts backspace even when the field is empty.
- * 2. Can lock the cursor to the end of text (for live typing mode).
+ * 2. Can block touch-based cursor movement (for live typing mode).
  */
 class HidEditText @JvmOverloads constructor(
     context: Context,
@@ -21,7 +22,7 @@ class HidEditText @JvmOverloads constructor(
     /** Called when backspace is pressed but the field is empty. */
     var onEmptyBackspace: (() -> Unit)? = null
 
-    /** When true, cursor is always forced to the end of text. */
+    /** When true, touches won't move the cursor — it stays at the end. */
     var lockCursorToEnd: Boolean = false
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
@@ -37,13 +38,17 @@ class HidEditText @JvmOverloads constructor(
         }
     }
 
-    override fun onSelectionChanged(selStart: Int, selEnd: Int) {
-        super.onSelectionChanged(selStart, selEnd)
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
         if (lockCursorToEnd) {
-            val len = text?.length ?: 0
-            if (selStart != len || selEnd != len) {
-                post { setSelection(len) }
+            // Let the touch through for focus/keyboard but don't let it move the cursor
+            if (event?.action == MotionEvent.ACTION_UP) {
+                requestFocus()
+                // Keep cursor at the end
+                text?.let { setSelection(it.length) }
+                return true
             }
+            return true
         }
+        return super.onTouchEvent(event)
     }
 }

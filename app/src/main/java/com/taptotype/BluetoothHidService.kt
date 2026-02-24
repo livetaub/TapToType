@@ -11,7 +11,7 @@ import java.util.*
 import java.util.concurrent.Executors
 
 @SuppressLint("MissingPermission")
-class BluetoothHidService(private val context: Context) {
+class BluetoothHidService private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "BluetoothHidService"
@@ -22,7 +22,16 @@ class BluetoothHidService(private val context: Context) {
         private const val REGISTER_TIMEOUT_MS = 3000L
         private const val MAX_REGISTER_RETRIES = 5
         private const val MAX_LOG_ENTRIES = 200
-        private const val KEEP_ALIVE_INTERVAL_MS = 30_000L  // Send keep-alive every 30s
+        private const val KEEP_ALIVE_INTERVAL_MS = 30_000L
+
+        @Volatile
+        private var instance: BluetoothHidService? = null
+
+        fun getInstance(context: Context): BluetoothHidService {
+            return instance ?: synchronized(this) {
+                instance ?: BluetoothHidService(context.applicationContext).also { instance = it }
+            }
+        }
     }
 
     private val bluetoothManager: BluetoothManager =
@@ -40,8 +49,8 @@ class BluetoothHidService(private val context: Context) {
     var onConnectionStateChanged: ((Boolean, String) -> Unit)? = null
     var onDetailedStatus: ((String) -> Unit)? = null
 
-    /** When true, Enter sends Shift+Enter (line break in chat apps) */
-    var useShiftEnter: Boolean = false
+    /** When true, Enter key sends Shift+Enter (line break). Default: true */
+    var useShiftEnter: Boolean = true
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val keyExecutor = Executors.newSingleThreadExecutor()
@@ -792,12 +801,11 @@ class BluetoothHidService(private val context: Context) {
         keyExecutor.execute {
             for (char in text) {
                 if (char == '\n') {
-                    // Use the Enter setting for newlines in text
+                    // Newlines in text ALWAYS send Shift+Enter (line break)
+                    // The enter key setting only affects the Enter key press
                     val hid = hidDevice ?: return@execute
                     val device = connectedDevice ?: return@execute
-                    val report = if (useShiftEnter) HidKeyMapper.createShiftEnterReport()
-                                 else HidKeyMapper.createEnterReport()
-                    hid.sendReport(device, 0, report)
+                    hid.sendReport(device, 0, HidKeyMapper.createShiftEnterReport())
                     Thread.sleep(KEY_PRESS_DELAY_MS)
                     hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
                     Thread.sleep(KEY_SEQUENCE_DELAY_MS)
@@ -869,16 +877,11 @@ class BluetoothHidService(private val context: Context) {
         isCleaningUp = true
 
         // Remove ALL pending callbacks to prevent zombie re-register loops
-        // (critical during theme changes which recreate the Activity)
         mainHandler.removeCallbacksAndMessages(null)
 
         stopKeepAlive()
         cancelConnectionTimeout()
         cancelRegisterTimeout()
-
-        // Detach listeners so dead Activity doesn't get callbacks
-        onConnectionStateChanged = null
-        onDetailedStatus = null
 
         try {
             hidDevice?.let { hid ->
@@ -892,8 +895,7 @@ class BluetoothHidService(private val context: Context) {
         isRegistered = false
         isConnected = false
         pendingConnectDevice = null
-        // NOTE: isCleaningUp stays true — this instance is being destroyed.
-        // A new BluetoothHidService will be created by the new Activity.
+        isCleaningUp = false  // Reset — singleton instance will be reused
     }
 
     data class ConnectResult(val accepted: Boolean, val message: String)

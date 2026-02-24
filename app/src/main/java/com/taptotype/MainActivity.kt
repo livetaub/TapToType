@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var addNewDeviceButton: Button
     private lateinit var savedDevicesSection: LinearLayout
     private lateinit var savedDevicesContainer: LinearLayout
-    private lateinit var disconnectButton: Button
+    private lateinit var disconnectButton: TextView
     private lateinit var settingsButton: ImageButton
     private lateinit var deviceListLabel: TextView
 
@@ -161,9 +161,9 @@ class MainActivity : AppCompatActivity() {
         settingsButton = findViewById(R.id.settingsButton)
         deviceListLabel = findViewById(R.id.deviceListLabel)
 
-        hidService = BluetoothHidService(this)
+        hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-            .getBoolean(PREF_SHIFT_ENTER, false)
+            .getBoolean(PREF_SHIFT_ENTER, true)
         setupUI()
         checkPermissions()
     }
@@ -171,7 +171,9 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         wizardDialog?.dismiss()
-        hidService.cleanup()
+        // NOTE: We do NOT call hidService.cleanup() here.
+        // The BT connection must survive Activity recreation, backgrounding, and screen lock.
+        // Cleanup only happens on explicit user disconnect.
     }
 
     // ============================================================
@@ -200,15 +202,29 @@ class MainActivity : AppCompatActivity() {
     // UI Setup
     // ============================================================
 
+    @SuppressLint("MissingPermission")
     private fun setupUI() {
         hidService.onConnectionStateChanged = { connected, status ->
             runOnUiThread {
                 updateConnectionStatus(connected, status)
                 refreshWizardStatus()
-                // Prompt to save device after first successful connection
-                if (connected && !hasPromptedSave) {
-                    hasPromptedSave = true
-                    promptSaveDevice()
+
+                if (connected) {
+                    // Start foreground service to keep connection alive in background
+                    val deviceName = hidService.getConnectedDevice()?.name ?: "PC"
+                    val serviceIntent = Intent(this, HidForegroundService::class.java).apply {
+                        putExtra("device_name", deviceName)
+                    }
+                    startForegroundService(serviceIntent)
+
+                    // Prompt to save device after first successful connection
+                    if (!hasPromptedSave) {
+                        hasPromptedSave = true
+                        promptSaveDevice()
+                    }
+                } else {
+                    // Stop foreground service when disconnected
+                    stopService(Intent(this, HidForegroundService::class.java))
                 }
             }
         }
@@ -267,6 +283,15 @@ class MainActivity : AppCompatActivity() {
 
         settingsButton.setOnClickListener {
             showSettingsDialog()
+        }
+
+        // Scroll to input field when keyboard opens
+        inputField.setOnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                view.postDelayed({
+                    view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height))
+                }, 300)
+            }
         }
 
         inputField.addTextChangedListener(object : TextWatcher {
@@ -333,14 +358,23 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun updateConnectionStatus(connected: Boolean, status: String) {
-        statusText.text = status
         if (connected) {
+            // Show saved name if available, otherwise BT name
+            val device = hidService.getConnectedDevice()
+            val mac = device?.address ?: ""
+            val savedDevice = getSavedDevices().find { it.macAddress == mac }
+            val displayName = savedDevice?.name ?: device?.name ?: "PC"
+
+            statusText.text = "Connected to $displayName"
+            deviceListLabel.text = mac
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
             savedDevicesSection.visibility = View.GONE
             disconnectButton.visibility = View.VISIBLE
             wizardDialog?.dismiss()
         } else {
+            statusText.text = status
             statusIndicator.setBackgroundResource(R.drawable.status_disconnected)
             savedDevicesSection.visibility = View.VISIBLE
             disconnectButton.visibility = View.GONE
