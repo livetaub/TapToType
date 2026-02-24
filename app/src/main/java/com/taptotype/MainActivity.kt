@@ -1054,31 +1054,45 @@ class MainActivity : AppCompatActivity() {
         val saved = getSavedDevices()
 
         if (saved.isEmpty()) {
-            // Show a hint when no devices saved
-            val hint = TextView(this).apply {
-                text = "No saved devices yet\nTap below to set up your first connection"
+            // Section header
+            val header = TextView(this).apply {
+                text = "No saved devices"
                 textSize = 14f
-                typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setTextColor(resources.getColor(R.color.text_tertiary, theme))
                 gravity = android.view.Gravity.CENTER
-                setLineSpacing(8f, 1f)
                 setPadding(0, 48, 0, 48)
             }
-            savedDevicesContainer.addView(hint)
+            savedDevicesContainer.addView(header)
             return
         }
+
+        // Section header when devices exist
+        val header = TextView(this).apply {
+            text = "Select a device to connect"
+            textSize = 14f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(resources.getColor(R.color.text_secondary, theme))
+            setPadding(0, 0, 0, (16 * resources.displayMetrics.density).toInt())
+        }
+        savedDevicesContainer.addView(header)
 
         for (device in saved) {
             val card = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
                 setBackgroundResource(R.drawable.card_background)
-                setPadding(48, 40, 48, 40)
+                setPadding(48, 40, 16, 40)
+                isClickable = true
+                isFocusable = true
+                val outValue = android.util.TypedValue()
+                context.theme.resolveAttribute(android.R.attr.selectableItemBackground, outValue, true)
+                foreground = ContextCompat.getDrawable(context, outValue.resourceId)
                 val params = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 )
-                params.bottomMargin = 20
+                params.bottomMargin = 16
                 layoutParams = params
             }
 
@@ -1117,38 +1131,31 @@ class MainActivity : AppCompatActivity() {
             infoCol.addView(nameView)
             infoCol.addView(addrView)
 
-            card.addView(deviceIcon)
-
-            // Connect button
-            val connectBtn = Button(this).apply {
-                text = "Connect"
-                textSize = 14f
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                setBackgroundResource(R.drawable.button_primary_bg)
-                setTextColor(android.graphics.Color.WHITE)
-                isAllCaps = false
-                setPadding(48, 20, 48, 20)
-                stateListAnimator = null
-                val params = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                params.marginStart = 20
-                layoutParams = params
+            // Ellipsis menu button (rename/delete)
+            val menuBtn = ImageButton(this).apply {
+                setImageResource(R.drawable.ic_more_vert)
+                val btnSize = (44 * resources.displayMetrics.density).toInt()
+                layoutParams = LinearLayout.LayoutParams(btnSize, btnSize)
+                val outValue = android.util.TypedValue()
+                context.theme.resolveAttribute(android.R.attr.selectableItemBackgroundBorderless, outValue, true)
+                setBackgroundResource(outValue.resourceId)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
+                val pad = (10 * resources.displayMetrics.density).toInt()
+                setPadding(pad, pad, pad, pad)
+                contentDescription = "Options"
+            }
+            menuBtn.setOnClickListener {
+                showSavedDeviceOptions(device)
             }
 
-            connectBtn.setOnClickListener {
+            // Tap card to connect
+            card.setOnClickListener {
                 connectToSavedDevice(device)
             }
 
-            // Long-press for rename/remove
-            card.setOnLongClickListener {
-                showSavedDeviceOptions(device)
-                true
-            }
-
+            card.addView(deviceIcon)
             card.addView(infoCol)
-            card.addView(connectBtn)
+            card.addView(menuBtn)
             savedDevicesContainer.addView(card)
         }
     }
