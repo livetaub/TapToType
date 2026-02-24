@@ -21,71 +21,77 @@
              ========================================== -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+            android:layout_marginBottom="8dp"
+            android:minHeight="56dp">
 
-            <!-- App title (shown when NOT connected) -->
+            <!-- Left: Title + optional connected subtitle -->
             <LinearLayout
-                android:id="@+id/appTitleRow"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:orientation="vertical">
 
-                <ImageView
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:src="@drawable/ic_logo_inline"
-                    android:contentDescription="TapToType"
-                    android:layout_marginEnd="10dp" />
-
-                <TextView
-                    android:id="@+id/appTitle"
+                <!-- App title row — always visible -->
+                <LinearLayout
+                    android:id="@+id/appTitleRow"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="TapToType"
-                    android:textSize="22sp"
-                    android:textColor="@color/text_primary"
-                    android:textStyle="bold"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="-0.02" />
-            </LinearLayout>
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-            <!-- Connected bar (shown when connected) -->
-            <LinearLayout
-                android:id="@+id/connectedBar"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:visibility="gone">
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:src="@drawable/ic_logo_inline"
+                        android:contentDescription="TapToType"
+                        android:layout_marginEnd="10dp" />
 
-                <View
-                    android:id="@+id/statusIndicator"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
-                    android:background="@drawable/status_connected"
-                    android:layout_marginEnd="10dp" />
+                    <TextView
+                        android:id="@+id/appTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TapToType"
+                        android:textSize="22sp"
+                        android:textColor="@color/text_primary"
+                        android:textStyle="bold"
+                        android:fontFamily="sans-serif-medium"
+                        android:letterSpacing="-0.02" />
+                </LinearLayout>
 
-                <TextView
-                    android:id="@+id/statusText"
-                    android:layout_width="0dp"
+                <!-- Connected subtitle — shown when connected -->
+                <LinearLayout
+                    android:id="@+id/connectedBar"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text=""
-                    android:textSize="16sp"
-                    android:textColor="@color/text_primary"
-                    android:fontFamily="sans-serif-medium"
-                    android:letterSpacing="-0.01"
-                    android:singleLine="true"
-                    android:ellipsize="end" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:paddingTop="2dp"
+                    android:visibility="gone">
+
+                    <View
+                        android:id="@+id/statusIndicator"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/status_connected"
+                        android:layout_marginEnd="8dp" />
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textSize="13sp"
+                        android:textColor="@color/text_secondary"
+                        android:fontFamily="sans-serif"
+                        android:singleLine="true"
+                        android:ellipsize="end" />
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Settings button (shown when NOT connected) -->
+            <!-- Right: Settings OR ellipsis -->
             <ImageButton
                 android:id="@+id/settingsButton"
                 android:layout_width="44dp"
@@ -96,7 +102,6 @@
                 android:contentDescription="Settings"
                 android:padding="10dp" />
 
-            <!-- Ellipsis menu (shown when connected) -->
             <ImageButton
                 android:id="@+id/connectedMenuButton"
                 android:layout_width="44dp"
@@ -297,6 +302,7 @@
                     android:layout_height="56dp"
                     android:layout_weight="1"
                     android:text="Clear"
+                    android:textColor="@color/button_secondary_text"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium" />
             </LinearLayout>

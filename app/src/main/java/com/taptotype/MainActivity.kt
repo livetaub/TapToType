@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_CANCELED) {
             Toast.makeText(this, "Discoverable mode denied", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds ✅", Toast.LENGTH_SHORT).show()
             refreshWizardStatus()
         }
     }
@@ -253,7 +253,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Mode spinner setup
-        val modeOptions = arrayOf("Live Typing", "Type & Send")
+        val modeOptions = arrayOf("⌨️  Live Typing", "📤  Type & Send")
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modeOptions)
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         modeSpinner.adapter = spinnerAdapter
@@ -389,7 +389,6 @@ class MainActivity : AppCompatActivity() {
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
 
             // Animated switch to connected state
-            fadeOutView(appTitleRow)
             fadeOutView(settingsButton)
             fadeOutView(disconnectedSection)
             connectedBar.visibility = View.VISIBLE
@@ -404,10 +403,8 @@ class MainActivity : AppCompatActivity() {
             fadeOutView(connectedBar)
             fadeOutView(connectedMenuButton)
             fadeOutView(typingSection)
-            appTitleRow.visibility = View.VISIBLE
             settingsButton.visibility = View.VISIBLE
             disconnectedSection.visibility = View.VISIBLE
-            fadeInView(appTitleRow)
             fadeInView(settingsButton)
             fadeInView(disconnectedSection)
 
@@ -446,9 +443,9 @@ class MainActivity : AppCompatActivity() {
     private fun showConnectedMenu() {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setItems(arrayOf(
-                "Disconnect",
-                "Settings",
-                "Diagnostics"
+                "⚡  Disconnect",
+                "⚙️  Settings",
+                "📋  Diagnostics"
             )) { _, which ->
                 when (which) {
                     0 -> confirmDisconnect()
@@ -470,16 +467,16 @@ class MainActivity : AppCompatActivity() {
         val enterLabel = if (hidService.useShiftEnter) "Shift+Enter (line break)" else "Enter (submit)"
 
         val items = mutableListOf<String>()
-        items.add("Theme: ${when(currentTheme) { 0 -> "Light"; 1 -> "Dark"; else -> "System" }}")
-        items.add("Enter key: $enterLabel")
-        if (hidService.isConnected) items.add("Disconnect from PC")
-        if (!hidService.isRegistered) items.add("Retry HID Registration")
-        items.add("Re-initialize Bluetooth")
-        items.add("Show Diagnostics")
-        items.add("View Logs")
+        items.add("🎨  Theme: ${when(currentTheme) { 0 -> "Light ☀️"; 1 -> "Dark 🌙"; else -> "System 🔄" }}")
+        items.add("↵  Enter key: $enterLabel")
+        if (hidService.isConnected) items.add("⚡  Disconnect from PC")
+        if (!hidService.isRegistered) items.add("🔁  Retry HID Registration")
+        items.add("🔄  Re-initialize Bluetooth")
+        items.add("🔍  Show Diagnostics")
+        items.add("📋  View Logs")
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Settings")
+            .setTitle("⚙️  Settings")
             .setItems(items.toTypedArray()) { _, which ->
                 var idx = 1
                 when (which) {
@@ -512,7 +509,7 @@ class MainActivity : AppCompatActivity() {
         val currentTheme = prefs.getInt(PREF_THEME_MODE, 0)
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Choose Theme")
-            .setSingleChoiceItems(arrayOf("Light", "Dark", "Follow System"), currentTheme) { dialog, which ->
+            .setSingleChoiceItems(arrayOf("☀️  Light", "🌙  Dark", "🔄  Follow System"), currentTheme) { dialog, which ->
                 setThemeMode(which)
                 dialog.dismiss()
             }
@@ -526,8 +523,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Enter Key Behavior")
             .setSingleChoiceItems(
                 arrayOf(
-                    "Enter (submit / confirm)",
-                    "Shift+Enter (line break)"
+                    "↵  Enter (submit / confirm)",
+                    "⇧↵  Shift+Enter (line break)"
                 ),
                 currentChoice
             ) { dialog, which ->
@@ -584,7 +581,7 @@ class MainActivity : AppCompatActivity() {
         }
         scrollView.addView(tv)
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Diagnostics")
+            .setTitle("🔍  Diagnostics")
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy") { _, _ ->
@@ -613,7 +610,7 @@ class MainActivity : AppCompatActivity() {
         scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Connection Logs")
+            .setTitle("📋  Connection Logs")
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy All") { _, _ ->
@@ -671,7 +668,7 @@ class MainActivity : AppCompatActivity() {
                 hint = "The app needs Bluetooth to communicate with your PC.",
                 canAutoDetect = true,
                 detectCheck = { hidService.bluetoothAdapter?.isEnabled == true },
-                detectLabel = { if (it) "Bluetooth is on" else "Bluetooth is off" },
+                detectLabel = { if (it) "✅ Bluetooth is ON" else "❌ Bluetooth is OFF" },
                 actionLabel = "Turn On Bluetooth",
                 actionCallback = {
                     val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -688,7 +685,7 @@ class MainActivity : AppCompatActivity() {
                         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
                     }
                 },
-                detectLabel = { if (it) "All permissions granted" else "Permissions needed" },
+                detectLabel = { if (it) "✅ All permissions granted" else "❌ Permissions needed" },
                 actionLabel = "Grant Permissions",
                 actionCallback = {
                     val missing = requiredPermissions.filter {
@@ -697,7 +694,7 @@ class MainActivity : AppCompatActivity() {
                     if (missing.isNotEmpty()) {
                         permissionLauncher.launch(missing.toTypedArray())
                     } else {
-                        Toast.makeText(this, "All permissions already granted", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "All permissions already granted ✅", Toast.LENGTH_SHORT).show()
                         refreshWizardStatus()
                     }
                 }
@@ -709,7 +706,7 @@ class MainActivity : AppCompatActivity() {
                 canAutoDetect = false,
                 detectCheck = { true },
                 detectLabel = { "" },
-                actionLabel = "Make Discoverable",
+                actionLabel = "📡  Make Discoverable",
                 actionCallback = {
                     requestDiscoverableMode()
                 }
@@ -728,7 +725,7 @@ class MainActivity : AppCompatActivity() {
                         "The phone must advertise as a keyboard during pairing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.getPairedDevices().isNotEmpty() },
-                detectLabel = { if (it) "Paired device(s) found" else "Waiting — pair from your PC" },
+                detectLabel = { if (it) "✅ Paired device(s) found" else "⏳ Waiting — pair from your PC" },
                 actionLabel = "Open Bluetooth Settings (to unpair)",
                 actionCallback = {
                     try {
@@ -745,8 +742,8 @@ class MainActivity : AppCompatActivity() {
                 hint = "Once connected, click any text field on your PC and start typing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.isConnected },
-                detectLabel = { if (it) "Connected!" else "Not connected yet" },
-                actionLabel = "Connect to Device",
+                detectLabel = { if (it) "✅ Connected!" else "⏳ Not connected yet" },
+                actionLabel = "🔗  Connect to Device",
                 actionCallback = {
                     showDeviceSelectionDialog()
                 }
@@ -799,7 +796,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             backButton.visibility = if (wizardCurrentStep > 0) View.VISIBLE else View.GONE
-            nextButton.text = if (wizardCurrentStep == steps.size - 1) "Done" else "Next"
+            nextButton.text = if (wizardCurrentStep == steps.size - 1) "Done ✅" else "Next →"
         }
 
         // Action button click — delegates to the current step's callback
@@ -1036,7 +1033,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Connected! Save this device?")
+            .setTitle("✅ Connected! Save this device?")
             .setMessage("Give this PC a name for quick reconnecting:")
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
@@ -1044,7 +1041,7 @@ class MainActivity : AppCompatActivity() {
                 val devices = getSavedDevices()
                 devices.add(SavedDevice(customName, mac, btName))
                 saveSavedDevices(devices)
-                Toast.makeText(this, "Saved \"$customName\"", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Saved \"$customName\" ✅", Toast.LENGTH_SHORT).show()
                 refreshSavedDevicesUI()
             }
             .setNegativeButton("Skip", null)
@@ -1162,7 +1159,7 @@ class MainActivity : AppCompatActivity() {
         val btDevice = hidService.getPairedDevices().find { it.address == device.macAddress }
         if (btDevice == null) {
             AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("Device Not Found")
+                .setTitle("⚠️ Device Not Found")
                 .setMessage("\"${device.name}\" (${device.macAddress}) is not currently paired.\n\n" +
                         "You may need to re-pair it from your PC's Bluetooth settings.")
                 .setPositiveButton("Open Setup Wizard") { _, _ -> showSetupWizard() }
@@ -1200,7 +1197,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSavedDeviceOptions(device: SavedDevice) {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle(device.name)
-            .setItems(arrayOf("Rename", "Remove")) { _, which ->
+            .setItems(arrayOf("✏️ Rename", "🗑️ Remove")) { _, which ->
                 when (which) {
                     0 -> renameSavedDevice(device)
                     1 -> removeSavedDevice(device)
@@ -1263,7 +1260,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showErrorDialog(title: String, message: String) {
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle(title)
+            .setTitle("⚠️  $title")
             .setMessage(message)
             .setPositiveButton("OK", null)
             .setNeutralButton("Diagnostics") { _, _ -> showDiagnostics() }
