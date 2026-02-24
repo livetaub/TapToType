@@ -273,6 +273,8 @@
                 android:inputType="textMultiLine"
                 android:importantForAutofill="no"
                 android:lineSpacingExtra="6dp"
+                android:scrollbars="vertical"
+                android:overScrollMode="always"
                 tools:ignore="LabelFor" />
 
             <!-- Action Buttons -->

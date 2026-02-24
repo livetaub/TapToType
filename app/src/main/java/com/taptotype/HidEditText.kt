@@ -35,6 +35,24 @@ class HidEditText @JvmOverloads constructor(
                 }
                 return super.deleteSurroundingText(beforeLength, afterLength)
             }
+
+            override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
+                if (beforeLength == 1 && afterLength == 0 && text?.isEmpty() == true) {
+                    onEmptyBackspace?.invoke()
+                    return true
+                }
+                return super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
+            }
+
+            override fun sendKeyEvent(event: android.view.KeyEvent): Boolean {
+                if (event.action == android.view.KeyEvent.ACTION_DOWN
+                    && event.keyCode == android.view.KeyEvent.KEYCODE_DEL
+                    && text?.isEmpty() == true) {
+                    onEmptyBackspace?.invoke()
+                    return true
+                }
+                return super.sendKeyEvent(event)
+            }
         }
     }
 
@@ -48,6 +66,10 @@ class HidEditText @JvmOverloads constructor(
                 return true
             }
             return true
+        }
+        // Allow this EditText to scroll independently of the parent ScrollView
+        if (event?.action == MotionEvent.ACTION_DOWN) {
+            parent?.requestDisallowInterceptTouchEvent(true)
         }
         return super.onTouchEvent(event)
     }

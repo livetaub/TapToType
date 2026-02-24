@@ -328,30 +328,32 @@ class MainActivity : AppCompatActivity() {
 
                 val currentText = s?.toString() ?: ""
 
-                // Backspace works in BOTH modes
-                if (currentText.length < previousText.length) {
-                    val deletedCount = previousText.length - currentText.length
-                    repeat(deletedCount) { hidService.sendBackspace() }
-                } else if (isLiveMode && currentText.length > previousText.length) {
-                    // Live mode: send new characters immediately
-                    val newChars = currentText.substring(previousText.length)
-                    for (char in newChars) { hidService.sendKeyPress(char) }
+                if (isLiveMode) {
+                    // Live mode: send keystrokes immediately
+                    if (currentText.length < previousText.length) {
+                        val deletedCount = previousText.length - currentText.length
+                        repeat(deletedCount) { hidService.sendBackspace() }
+                    } else if (currentText.length > previousText.length) {
+                        val newChars = currentText.substring(previousText.length)
+                        for (char in newChars) { hidService.sendKeyPress(char) }
+                    }
                 }
+                // Type & Send mode: text stays local until Send is tapped
 
                 previousText = currentText
             }
         })
 
-        // Enter key works in both modes
+        // Enter key — only send to PC in live mode
         inputField.setOnKeyListener { _, keyCode, event ->
             if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
-                if (hidService.isConnected) hidService.sendEnter()
+                if (isLiveMode && hidService.isConnected) hidService.sendEnter()
                 false
             } else false
         }
-        // Backspace on empty field — still send to PC
+        // Backspace on empty field — only send to PC in live mode
         inputField.onEmptyBackspace = {
-            if (hidService.isConnected) hidService.sendBackspace()
+            if (isLiveMode && hidService.isConnected) hidService.sendBackspace()
         }
 
         // Immediately sync UI with current service state
@@ -385,7 +387,7 @@ class MainActivity : AppCompatActivity() {
             val savedDevice = getSavedDevices().find { it.macAddress == mac }
             val displayName = savedDevice?.name ?: device?.name ?: "PC"
 
-            statusText.text = displayName
+            statusText.text = "Connected to: $displayName"
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
 
             // Animated switch to connected state

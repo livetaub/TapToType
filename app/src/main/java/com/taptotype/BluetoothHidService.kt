@@ -61,6 +61,8 @@ class BluetoothHidService private constructor(private val context: Context) {
     private var registerTimeoutRunnable: Runnable? = null
     private var registerRetryCount = 0
     private var keepAliveRunnable: Runnable? = null
+    private var keepAliveFailCount = 0
+    private val KEEP_ALIVE_MAX_FAILURES = 3
 
     // Flag to distinguish intentional unregister (cleanup/reinit) from
     // unexpected system unregistration (Android BT stack timeout)
@@ -739,6 +741,7 @@ class BluetoothHidService private constructor(private val context: Context) {
 
     private fun startKeepAlive() {
         stopKeepAlive()
+        keepAliveFailCount = 0
         log("D", "Starting keep-alive (every ${KEEP_ALIVE_INTERVAL_MS / 1000}s)")
         keepAliveRunnable = object : Runnable {
             override fun run() {
@@ -747,12 +750,36 @@ class BluetoothHidService private constructor(private val context: Context) {
                     val device = connectedDevice
                     if (hid != null && device != null) {
                         try {
-                            // Send an empty key-up report (all zeros = no keys pressed)
                             val emptyReport = HidKeyMapper.createKeyUpReport()
                             val sent = hid.sendReport(device, 0, emptyReport)
-                            log("D", "Keep-alive sent: $sent")
+                            if (sent) {
+                                keepAliveFailCount = 0
+                                log("D", "Keep-alive OK")
+                            } else {
+                                keepAliveFailCount++
+                                log("W", "Keep-alive failed ($keepAliveFailCount/$KEEP_ALIVE_MAX_FAILURES)")
+                                if (keepAliveFailCount >= KEEP_ALIVE_MAX_FAILURES) {
+                                    log("E", "Connection appears dead — marking disconnected")
+                                    connectedDevice = null
+                                    isConnected = false
+                                    stopKeepAlive()
+                                    postDetailedStatus("Connection lost")
+                                    notifyConnectionState()
+                                    return
+                                }
+                            }
                         } catch (e: Exception) {
-                            log("W", "Keep-alive failed: ${e.message}")
+                            keepAliveFailCount++
+                            log("W", "Keep-alive exception ($keepAliveFailCount/$KEEP_ALIVE_MAX_FAILURES): ${e.message}")
+                            if (keepAliveFailCount >= KEEP_ALIVE_MAX_FAILURES) {
+                                log("E", "Connection appears dead — marking disconnected")
+                                connectedDevice = null
+                                isConnected = false
+                                stopKeepAlive()
+                                postDetailedStatus("Connection lost")
+                                notifyConnectionState()
+                                return
+                            }
                         }
                     }
                     mainHandler.postDelayed(this, KEEP_ALIVE_INTERVAL_MS)
