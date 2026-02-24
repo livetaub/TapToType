@@ -55,7 +55,7 @@
             android:textColor="@color/text_secondary"
             android:fontFamily="sans-serif"
             android:gravity="center"
-            android:layout_marginBottom="24dp" />
+            android:layout_marginBottom="20dp" />
 
         <!-- ========== Connection Status Card ========== -->
         <LinearLayout
@@ -64,14 +64,14 @@
             android:orientation="vertical"
             android:background="@drawable/card_background"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:layout_marginBottom="8dp">
+                android:layout_marginBottom="4dp">
 
                 <View
                     android:id="@+id/statusIndicator"
@@ -95,24 +95,40 @@
                 android:id="@+id/deviceListLabel"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="No paired devices"
+                android:text=""
                 android:textSize="12sp"
                 android:fontFamily="sans-serif"
                 android:textColor="@color/text_tertiary" />
         </LinearLayout>
 
-        <!-- ========== Setup / Connect Button (shows when NOT connected) ========== -->
-        <Button
-            android:id="@+id/setupHelpButton"
-            style="@style/PrimaryButton"
+        <!-- ========== Saved Devices Section (when NOT connected) ========== -->
+        <LinearLayout
+            android:id="@+id/savedDevicesSection"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="📡  Connect to a PC"
-            android:textSize="16sp"
-            android:fontFamily="sans-serif-medium"
-            android:layout_marginBottom="16dp" />
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="12dp">
 
-        <!-- ========== Disconnect Button (shows when connected) ========== -->
+            <!-- Saved device cards inserted dynamically here -->
+            <LinearLayout
+                android:id="@+id/savedDevicesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+
+            <Button
+                android:id="@+id/addNewDeviceButton"
+                style="@style/PrimaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:text="＋  Set Up New Device"
+                android:textSize="15sp"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginTop="8dp" />
+
+        </LinearLayout>
+
+        <!-- ========== Disconnect Button (when connected) ========== -->
         <Button
             android:id="@+id/disconnectButton"
             style="@style/SecondaryButton"
@@ -122,7 +138,7 @@
             android:textSize="14sp"
             android:fontFamily="sans-serif-medium"
             android:visibility="gone"
-            android:layout_marginBottom="16dp" />
+            android:layout_marginBottom="12dp" />
 
         <!-- ========== Mode Selector Card (Dropdown) ========== -->
         <LinearLayout
@@ -132,7 +148,7 @@
             android:background="@drawable/card_background"
             android:padding="16dp"
             android:gravity="center_vertical"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -162,7 +178,7 @@
             android:orientation="vertical"
             android:background="@drawable/card_background"
             android:padding="16dp"
-            android:layout_marginBottom="16dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:id="@+id/inputLabel"
@@ -180,7 +196,7 @@
                 android:id="@+id/inputField"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="200dp"
+                android:minHeight="180dp"
                 android:background="@drawable/input_background"
                 android:padding="16dp"
                 android:textSize="17sp"

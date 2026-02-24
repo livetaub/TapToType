@@ -261,7 +261,7 @@ class BluetoothHidService(private val context: Context) {
                             // Get a completely new proxy — this triggers onServiceConnected → registerApp()
                             initialize()
                         }
-                    }, 1000)
+                    }, 3000)  // 3s cooldown — BT stack needs time after disconnect
                 }
             }
         }
@@ -719,6 +719,8 @@ class BluetoothHidService(private val context: Context) {
         postDetailedStatus("Disconnecting...")
         hid.disconnect(device)
     }
+
+    fun getConnectedDevice(): BluetoothDevice? = connectedDevice
 
     fun getPairedDevices(): Set<BluetoothDevice> = bluetoothAdapter?.bondedDevices ?: emptySet()
 

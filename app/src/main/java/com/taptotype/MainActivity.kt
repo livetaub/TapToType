@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
@@ -16,6 +17,8 @@ import android.view.KeyEvent
 import android.view.View
 import android.widget.*
 import android.widget.ArrayAdapter
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -30,6 +33,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_NAME = "TapToTypePrefs"
         private const val PREF_THEME_MODE = "theme_mode"
         private const val PREF_SHIFT_ENTER = "enter_is_shift"
+        private const val PREF_SAVED_DEVICES = "saved_devices"
     }
 
     private lateinit var hidService: BluetoothHidService
@@ -41,7 +45,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeSpinner: Spinner
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
-    private lateinit var setupHelpButton: Button
+    private lateinit var addNewDeviceButton: Button
+    private lateinit var savedDevicesSection: LinearLayout
+    private lateinit var savedDevicesContainer: LinearLayout
     private lateinit var disconnectButton: Button
     private lateinit var settingsButton: ImageButton
     private lateinit var deviceListLabel: TextView
@@ -49,6 +55,8 @@ class MainActivity : AppCompatActivity() {
     private var isLiveMode: Boolean = true
     private var previousText: String = ""
     private var wizardDialog: AlertDialog? = null
+    private var hasPromptedSave = false  // prevent double save-prompt
+    private var ignoreTextChanges = false // suppress TextWatcher during programmatic clears
 
     // Wizard UI refs (held for refreshing from callbacks)
     private var wizardStatusDot: View? = null
@@ -57,6 +65,9 @@ class MainActivity : AppCompatActivity() {
     private var wizardActionButton: Button? = null
     private var wizardCurrentStep: Int = 0
     private var wizardSteps: List<WizardStep>? = null
+
+    // Saved device model
+    data class SavedDevice(val name: String, val macAddress: String, val btName: String)
 
     // ============================================================
     // Wizard Step data class
@@ -143,7 +154,9 @@ class MainActivity : AppCompatActivity() {
         modeSpinner = findViewById(R.id.modeSpinner)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
-        setupHelpButton = findViewById(R.id.setupHelpButton)
+        addNewDeviceButton = findViewById(R.id.addNewDeviceButton)
+        savedDevicesSection = findViewById(R.id.savedDevicesSection)
+        savedDevicesContainer = findViewById(R.id.savedDevicesContainer)
         disconnectButton = findViewById(R.id.disconnectButton)
         settingsButton = findViewById(R.id.settingsButton)
         deviceListLabel = findViewById(R.id.deviceListLabel)
@@ -192,6 +205,11 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 updateConnectionStatus(connected, status)
                 refreshWizardStatus()
+                // Prompt to save device after first successful connection
+                if (connected && !hasPromptedSave) {
+                    hasPromptedSave = true
+                    promptSaveDevice()
+                }
             }
         }
 
@@ -221,8 +239,10 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 if (hidService.isConnected) {
                     hidService.sendString(text)
+                    ignoreTextChanges = true
                     inputField.text.clear()
                     previousText = ""
+                    ignoreTextChanges = false
                     Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Not connected to any device", Toast.LENGTH_SHORT).show()
@@ -231,11 +251,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         clearButton.setOnClickListener {
+            ignoreTextChanges = true
             inputField.text.clear()
             previousText = ""
+            ignoreTextChanges = false
         }
 
-        setupHelpButton.setOnClickListener {
+        addNewDeviceButton.setOnClickListener {
             showSetupWizard()
         }
 
@@ -251,6 +273,7 @@ class MainActivity : AppCompatActivity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
+                if (ignoreTextChanges) return
                 if (!hidService.isConnected) {
                     previousText = s?.toString() ?: ""
                     return
@@ -279,6 +302,18 @@ class MainActivity : AppCompatActivity() {
                 false
             } else false
         }
+
+        // Immediately sync UI with current service state
+        // (handles Activity recreation while already connected)
+        val connDevice = hidService.getConnectedDevice()
+        @SuppressLint("MissingPermission")
+        val connName = connDevice?.name ?: connDevice?.address ?: ""
+        val currentStatus = when {
+            hidService.isConnected -> "Connected as Keyboard to $connName"
+            hidService.isRegistered -> "Ready — Tap 'Connect to Device'"
+            else -> "Not Connected"
+        }
+        updateConnectionStatus(hidService.isConnected, currentStatus)
     }
 
     @SuppressLint("MissingPermission")
@@ -296,13 +331,15 @@ class MainActivity : AppCompatActivity() {
         statusText.text = status
         if (connected) {
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
-            setupHelpButton.visibility = View.GONE
+            savedDevicesSection.visibility = View.GONE
             disconnectButton.visibility = View.VISIBLE
             wizardDialog?.dismiss()
         } else {
             statusIndicator.setBackgroundResource(R.drawable.status_disconnected)
-            setupHelpButton.visibility = View.VISIBLE
+            savedDevicesSection.visibility = View.VISIBLE
             disconnectButton.visibility = View.GONE
+            hasPromptedSave = false
+            refreshSavedDevicesUI()
         }
     }
 
@@ -759,11 +796,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         updatePairedDevicesList()
-
-        // Auto-show wizard if not connected
-        if (!hidService.isConnected) {
-            setupHelpButton.postDelayed({ showSetupWizard() }, 500)
-        }
+        refreshSavedDevicesUI()
     }
 
     // ============================================================
@@ -820,6 +853,264 @@ class MainActivity : AppCompatActivity() {
         } else {
             "Paired: ${devices.joinToString(", ") { it.name ?: it.address }}"
         }
+    }
+
+    // ============================================================
+    // Saved Devices
+    // ============================================================
+
+    private fun getSavedDevices(): MutableList<SavedDevice> {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val json = prefs.getString(PREF_SAVED_DEVICES, "[]") ?: "[]"
+        val list = mutableListOf<SavedDevice>()
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                list.add(SavedDevice(
+                    name = obj.getString("name"),
+                    macAddress = obj.getString("mac"),
+                    btName = obj.optString("btName", "")
+                ))
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error loading saved devices: ${e.message}")
+        }
+        return list
+    }
+
+    private fun saveSavedDevices(devices: List<SavedDevice>) {
+        val arr = JSONArray()
+        for (d in devices) {
+            arr.put(JSONObject().apply {
+                put("name", d.name)
+                put("mac", d.macAddress)
+                put("btName", d.btName)
+            })
+        }
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit().putString(PREF_SAVED_DEVICES, arr.toString()).apply()
+    }
+
+    private fun isDeviceSaved(macAddress: String): Boolean {
+        return getSavedDevices().any { it.macAddress == macAddress }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun promptSaveDevice() {
+        val device = hidService.getConnectedDevice() ?: return
+        val mac = device.address
+        val btName = device.name ?: "Unknown"
+
+        // Already saved? Don't prompt again
+        if (isDeviceSaved(mac)) return
+
+        val input = EditText(this).apply {
+            hint = "e.g. My Desktop, Work PC"
+            setText(btName)
+            selectAll()
+            setPadding(60, 40, 60, 40)
+            textSize = 16f
+            typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+        }
+
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("✅ Connected! Save this device?")
+            .setMessage("Give this PC a name for quick reconnecting:")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val customName = input.text.toString().trim().ifEmpty { btName }
+                val devices = getSavedDevices()
+                devices.add(SavedDevice(customName, mac, btName))
+                saveSavedDevices(devices)
+                Toast.makeText(this, "Saved \"$customName\" ✅", Toast.LENGTH_SHORT).show()
+                refreshSavedDevicesUI()
+            }
+            .setNegativeButton("Skip", null)
+            .show()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun refreshSavedDevicesUI() {
+        savedDevicesContainer.removeAllViews()
+        val saved = getSavedDevices()
+
+        if (saved.isEmpty()) {
+            // Show a hint when no devices saved
+            val hint = TextView(this).apply {
+                text = "No saved devices yet.\nTap \"Set Up New Device\" to pair your PC."
+                textSize = 14f
+                typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                setTextColor(resources.getColor(R.color.text_secondary, theme))
+                gravity = android.view.Gravity.CENTER
+                setPadding(0, 24, 0, 24)
+            }
+            savedDevicesContainer.addView(hint)
+            return
+        }
+
+        for (device in saved) {
+            val card = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                setBackgroundResource(R.drawable.card_background)
+                setPadding(40, 32, 40, 32)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.bottomMargin = 16
+                layoutParams = params
+            }
+
+            // Device info column
+            val infoCol = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            }
+
+            val nameView = TextView(this).apply {
+                text = "💻  ${device.name}"
+                textSize = 16f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setTextColor(resources.getColor(R.color.text_primary, theme))
+            }
+
+            val addrView = TextView(this).apply {
+                text = device.macAddress
+                textSize = 12f
+                typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+                setTextColor(resources.getColor(R.color.text_tertiary, theme))
+            }
+
+            infoCol.addView(nameView)
+            infoCol.addView(addrView)
+
+            // Connect button
+            val connectBtn = Button(this).apply {
+                text = "Connect"
+                textSize = 13f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setBackgroundResource(R.drawable.button_primary_bg)
+                setTextColor(resources.getColor(R.color.button_text, theme))
+                setPadding(32, 16, 32, 16)
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+                params.marginStart = 16
+                layoutParams = params
+            }
+
+            connectBtn.setOnClickListener {
+                connectToSavedDevice(device)
+            }
+
+            // Long-press for rename/remove
+            card.setOnLongClickListener {
+                showSavedDeviceOptions(device)
+                true
+            }
+
+            card.addView(infoCol)
+            card.addView(connectBtn)
+            savedDevicesContainer.addView(card)
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun connectToSavedDevice(device: SavedDevice) {
+        // Find the paired BT device by MAC
+        val btDevice = hidService.getPairedDevices().find { it.address == device.macAddress }
+        if (btDevice == null) {
+            AlertDialog.Builder(this, R.style.DialogTheme)
+                .setTitle("⚠️ Device Not Found")
+                .setMessage("\"${device.name}\" (${device.macAddress}) is not currently paired.\n\n" +
+                        "You may need to re-pair it from your PC's Bluetooth settings.")
+                .setPositiveButton("Open Setup Wizard") { _, _ -> showSetupWizard() }
+                .setNeutralButton("Remove from Saved") { _, _ ->
+                    val devices = getSavedDevices()
+                    devices.removeAll { it.macAddress == device.macAddress }
+                    saveSavedDevices(devices)
+                    refreshSavedDevicesUI()
+                    Toast.makeText(this, "Removed \"${device.name}\"", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+            return
+        }
+
+        statusText.text = "Connecting to ${device.name}..."
+        deviceListLabel.text = "Attempting connection..."
+
+        // Ensure HID is registered first
+        if (!hidService.isRegistered) {
+            Toast.makeText(this, "Initializing HID keyboard...", Toast.LENGTH_SHORT).show()
+            if (!hidService.isRegistered) {
+                hidService.initialize()
+            }
+        }
+
+        val result = hidService.connectToDevice(btDevice)
+        if (!result.accepted) {
+            showErrorDialog("Connection Failed", result.message)
+        } else {
+            Toast.makeText(this, "Connecting to ${device.name}...", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showSavedDeviceOptions(device: SavedDevice) {
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle(device.name)
+            .setItems(arrayOf("✏️ Rename", "🗑️ Remove")) { _, which ->
+                when (which) {
+                    0 -> renameSavedDevice(device)
+                    1 -> removeSavedDevice(device)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun renameSavedDevice(device: SavedDevice) {
+        val input = EditText(this).apply {
+            setText(device.name)
+            selectAll()
+            setPadding(60, 40, 60, 40)
+            textSize = 16f
+        }
+
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("Rename Device")
+            .setView(input)
+            .setPositiveButton("Save") { _, _ ->
+                val newName = input.text.toString().trim().ifEmpty { device.name }
+                val devices = getSavedDevices()
+                val idx = devices.indexOfFirst { it.macAddress == device.macAddress }
+                if (idx >= 0) {
+                    devices[idx] = device.copy(name = newName)
+                    saveSavedDevices(devices)
+                    refreshSavedDevicesUI()
+                    Toast.makeText(this, "Renamed to \"$newName\"", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun removeSavedDevice(device: SavedDevice) {
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("Remove \"${device.name}\"?")
+            .setMessage("This only removes it from your saved list. The Bluetooth pairing is not affected.")
+            .setPositiveButton("Remove") { _, _ ->
+                val devices = getSavedDevices()
+                devices.removeAll { it.macAddress == device.macAddress }
+                saveSavedDevices(devices)
+                refreshSavedDevicesUI()
+                Toast.makeText(this, "Removed \"${device.name}\"", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     @SuppressLint("MissingPermission")
