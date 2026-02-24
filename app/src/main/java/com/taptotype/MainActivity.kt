@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
     // UI elements
     private lateinit var statusIndicator: View
     private lateinit var statusText: TextView
-    private lateinit var inputField: EditText
+    private lateinit var inputField: HidEditText
     private lateinit var modeSpinner: Spinner
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
@@ -301,6 +301,10 @@ class MainActivity : AppCompatActivity() {
                 if (hidService.isConnected) hidService.sendEnter()
                 false
             } else false
+        }
+        // Backspace on empty field — still send to PC
+        inputField.onEmptyBackspace = {
+            if (hidService.isConnected) hidService.sendBackspace()
         }
 
         // Immediately sync UI with current service state

@@ -192,7 +192,7 @@
                 android:fontFamily="sans-serif-medium"
                 android:layout_marginBottom="8dp" />
 
-            <EditText
+            <com.taptotype.HidEditText
                 android:id="@+id/inputField"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
