@@ -335,7 +335,14 @@ class MainActivity : AppCompatActivity() {
                         repeat(deletedCount) { hidService.sendBackspace() }
                     } else if (currentText.length > previousText.length) {
                         val newChars = currentText.substring(previousText.length)
-                        for (char in newChars) { hidService.sendKeyPress(char) }
+                        for (char in newChars) {
+                            if (char == '\n') {
+                                // Route through sendEnter() which respects useShiftEnter setting
+                                hidService.sendEnter()
+                            } else {
+                                hidService.sendKeyPress(char)
+                            }
+                        }
                     }
                 }
                 // Type & Send mode: text stays local until Send is tapped
@@ -343,14 +350,6 @@ class MainActivity : AppCompatActivity() {
                 previousText = currentText
             }
         })
-
-        // Enter key — only send to PC in live mode
-        inputField.setOnKeyListener { _, keyCode, event ->
-            if (keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN) {
-                if (isLiveMode && hidService.isConnected) hidService.sendEnter()
-                false
-            } else false
-        }
         // Backspace on empty field — only send to PC in live mode
         inputField.onEmptyBackspace = {
             if (isLiveMode && hidService.isConnected) hidService.sendBackspace()
@@ -1045,6 +1044,8 @@ class MainActivity : AppCompatActivity() {
                 saveSavedDevices(devices)
                 Toast.makeText(this, "Saved \"$customName\" ✅", Toast.LENGTH_SHORT).show()
                 refreshSavedDevicesUI()
+                // Update the connected status text to show the saved name
+                statusText.text = "Connected to: $customName"
             }
             .setNegativeButton("Skip", null)
             .show()

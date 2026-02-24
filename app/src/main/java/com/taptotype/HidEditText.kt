@@ -56,21 +56,56 @@ class HidEditText @JvmOverloads constructor(
         }
     }
 
+    private var touchStartY = 0f
+    private var touchStartX = 0f
+    private var isDragging = false
+    private val TOUCH_SLOP by lazy {
+        android.view.ViewConfiguration.get(context).scaledTouchSlop
+    }
+
     override fun onTouchEvent(event: MotionEvent?): Boolean {
-        if (lockCursorToEnd) {
-            // Let the touch through for focus/keyboard but don't let it move the cursor
-            if (event?.action == MotionEvent.ACTION_UP) {
-                requestFocus()
-                // Keep cursor at the end
-                text?.let { setSelection(it.length) }
-                return true
-            }
-            return true
-        }
+        if (event == null) return super.onTouchEvent(event)
+
         // Allow this EditText to scroll independently of the parent ScrollView
-        if (event?.action == MotionEvent.ACTION_DOWN) {
+        if (event.action == MotionEvent.ACTION_DOWN) {
             parent?.requestDisallowInterceptTouchEvent(true)
         }
-        return super.onTouchEvent(event)
+
+        if (!lockCursorToEnd) {
+            return super.onTouchEvent(event)
+        }
+
+        // Live mode: handle scrolling manually, show keyboard on tap,
+        // never move the cursor
+        when (event.action) {
+            MotionEvent.ACTION_DOWN -> {
+                touchStartY = event.y
+                touchStartX = event.x
+                isDragging = false
+                return true
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val dy = touchStartY - event.y
+                if (!isDragging && (Math.abs(dy) > TOUCH_SLOP || Math.abs(touchStartX - event.x) > TOUCH_SLOP)) {
+                    isDragging = true
+                }
+                if (isDragging) {
+                    scrollBy(0, dy.toInt())
+                    touchStartY = event.y
+                }
+                return true
+            }
+            MotionEvent.ACTION_UP -> {
+                if (!isDragging) {
+                    // It was a tap — request focus and show the keyboard
+                    requestFocus()
+                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+                            as android.view.inputmethod.InputMethodManager
+                    imm.showSoftInput(this, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                }
+                return true
+            }
+        }
+        return true
     }
 }
