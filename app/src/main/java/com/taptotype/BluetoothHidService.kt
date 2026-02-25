@@ -78,7 +78,7 @@ class BluetoothHidService private constructor(private val context: Context) {
     /**
      * Add a timestamped entry to the in-app log and also Log.d
      */
-    private fun log(level: String, message: String) {
+    internal fun log(level: String, message: String) {
         val timestamp = timeFormat.format(Date())
         val entry = "[$timestamp] $level: $message"
         synchronized(logBuffer) {
