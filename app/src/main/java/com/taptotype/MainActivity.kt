@@ -61,6 +61,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var typingSection: LinearLayout
     private lateinit var inputField: HidEditText
     private lateinit var modeSpinner: Spinner
+    private lateinit var modeHelperText: TextView
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
 
@@ -185,6 +186,7 @@ class MainActivity : AppCompatActivity() {
         typingSection = findViewById(R.id.typingSection)
         inputField = findViewById(R.id.inputField)
         modeSpinner = findViewById(R.id.modeSpinner)
+        modeHelperText = findViewById(R.id.modeHelperText)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
         liveEchoScroll = findViewById(R.id.liveEchoScroll)
@@ -285,7 +287,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Mode spinner setup
-        val modeOptions = arrayOf("⌨️  Live Typing", "📤  Type & Send")
+        val modeOptions = arrayOf("⌨️  Live", "✏️  Compose")
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modeOptions)
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         modeSpinner.adapter = spinnerAdapter
@@ -296,9 +298,6 @@ class MainActivity : AppCompatActivity() {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                 isLiveMode = (position == 0)
                 updateModeUI(isLiveMode)
-                // Persist mode selection
-                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-                    .edit().putInt(PREF_DEFAULT_MODE, position).apply()
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
@@ -388,11 +387,12 @@ class MainActivity : AppCompatActivity() {
                     // Clear the field — live mode doesn't accumulate text
                     ignoreTextChanges = true
                     inputField.text?.clear()
+                    previousText = "" // field is now empty, must match
                     ignoreTextChanges = false
+                } else {
+                    // Type & Send mode: text stays local until Send is tapped
+                    previousText = currentText
                 }
-                // Type & Send mode: text stays local until Send is tapped
-
-                previousText = currentText
             }
         })
         // Backspace on empty field — only send to PC in live mode
@@ -417,7 +417,15 @@ class MainActivity : AppCompatActivity() {
             inputField.alpha = 0f
             inputField.lockCursorToEnd = true
             liveEchoScroll.visibility = View.VISIBLE
+            modeHelperText.text = "Each keystroke is sent to your PC instantly"
             clearEcho()
+            // Auto-focus and show keyboard
+            inputField.requestFocus()
+            inputField.postDelayed({
+                val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
+                        as android.view.inputmethod.InputMethodManager
+                imm.showSoftInput(inputField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }, 200)
         } else {
             sendButton.visibility = View.VISIBLE
             clearButton.visibility = View.VISIBLE
@@ -425,6 +433,7 @@ class MainActivity : AppCompatActivity() {
             inputField.hint = "Type your message, then tap Send…"
             inputField.lockCursorToEnd = false
             liveEchoScroll.visibility = View.GONE
+            modeHelperText.text = "Write your message first, then send it all at once"
         }
     }
 

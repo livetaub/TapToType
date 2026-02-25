@@ -65,8 +65,8 @@ class SettingsActivity : AppCompatActivity() {
         // Default mode
         val defaultMode = prefs.getInt(PREF_DEFAULT_MODE, 0)
         findViewById<TextView>(R.id.settingModeValue).text = when (defaultMode) {
-            0 -> "Live Typing"
-            else -> "Type & Send"
+            0 -> "Live"
+            else -> "Compose"
         }
 
         // Enter key
@@ -138,8 +138,8 @@ class SettingsActivity : AppCompatActivity() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         val current = prefs.getInt(PREF_DEFAULT_MODE, 0)
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Default mode")
-            .setSingleChoiceItems(arrayOf("Live Typing", "Type & Send"), current) { dialog, which ->
+            .setTitle("Default typing mode")
+            .setSingleChoiceItems(arrayOf("Live", "Compose"), current) { dialog, which ->
                 prefs.edit().putInt(PREF_DEFAULT_MODE, which).apply()
                 dialog.dismiss()
                 refreshValues()
@@ -213,36 +213,64 @@ class SettingsActivity : AppCompatActivity() {
         val categorySpinner = view.findViewById<Spinner>(R.id.contactCategory)
         val messageField = view.findViewById<EditText>(R.id.contactMessage)
 
+        // First item is a non-selectable hint
         val categories = arrayOf(
-            "🐛  Bug report",
-            "💡  Feature request",
-            "💬  Feedback",
-            "📎  Other"
+            "Select a reason…",
+            "🐛 Bug report",
+            "💡 Feature request",
+            "💬 Feedback",
+            "📎 Other"
         )
-        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, categories)
+        val adapter = object : ArrayAdapter<String>(
+            this, android.R.layout.simple_spinner_item, categories
+        ) {
+            override fun isEnabled(position: Int) = position != 0
+
+            override fun getDropDownView(position: Int, convertView: android.view.View?, parent: android.view.ViewGroup): android.view.View {
+                val v = super.getDropDownView(position, convertView, parent) as TextView
+                if (position == 0) v.setTextColor(resources.getColor(R.color.text_tertiary, theme))
+                return v
+            }
+        }
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         categorySpinner.adapter = adapter
+        categorySpinner.setSelection(0)
 
-        AlertDialog.Builder(this, R.style.DialogTheme)
+        val dialog = AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Contact Support")
             .setView(view)
-            .setPositiveButton("Send") { _, _ ->
-                val name = nameField.text.toString().trim()
-                val email = emailField.text.toString().trim()
-                val category = categorySpinner.selectedItem.toString()
-                    .replace(Regex("^[^a-zA-Z]+"), "").trim()
-                val message = messageField.text.toString().trim()
-
-                if (name.isEmpty() || email.isEmpty() || message.isEmpty()) {
-                    Toast.makeText(this, "Please fill in all fields", Toast.LENGTH_SHORT).show()
-                    return@setPositiveButton
-                }
-
-                Toast.makeText(this, "Sending…", Toast.LENGTH_SHORT).show()
-                sendGoogleForm(name, email, category, message)
-            }
+            .setPositiveButton("Send", null) // null — we override below
             .setNegativeButton("Cancel", null)
-            .show()
+            .create()
+
+        dialog.show()
+
+        // Override the Send button so the dialog doesn't auto-close on error
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val name = nameField.text.toString().trim()
+            val email = emailField.text.toString().trim()
+            val message = messageField.text.toString().trim()
+            val categoryPos = categorySpinner.selectedItemPosition
+
+            // Validate all fields
+            if (name.isEmpty() || email.isEmpty() || message.isEmpty() || categoryPos == 0) {
+                Toast.makeText(this, "All fields are required", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Validate email format
+            if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                Toast.makeText(this, "Please enter a valid email address", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
+            // Send the raw category value (with emoji) so it matches the Google Form dropdown
+            val category = categorySpinner.selectedItem.toString()
+
+            Toast.makeText(this, "Sending…", Toast.LENGTH_SHORT).show()
+            dialog.dismiss()
+            sendGoogleForm(name, email, category, message)
+        }
     }
 
     private fun sendGoogleForm(name: String, email: String, category: String, message: String) {
