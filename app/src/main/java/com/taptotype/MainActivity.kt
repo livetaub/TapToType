@@ -211,6 +211,18 @@ class MainActivity : AppCompatActivity() {
         hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .getBoolean(PREF_SHIFT_ENTER, true)
+
+        // Global crash handler — logs crash to in-app log for diagnostics
+        val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val stackTrace = throwable.stackTraceToString()
+                    .take(2000) // cap length
+                hidService.log("CRASH", "Uncaught exception in ${thread.name}:\n$stackTrace")
+            } catch (_: Exception) { /* last resort — don't crash the crash handler */ }
+            defaultHandler?.uncaughtException(thread, throwable)
+        }
+
         setupUI()
         checkPermissions()
     }
@@ -347,23 +359,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Focus state background + scroll to expose action buttons
+        val mainScrollView = findViewById<ScrollView>(R.id.mainScrollView)
         inputField.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                inputField.setBackgroundResource(R.drawable.input_background_focused)
-                if (!isLiveMode) {
-                    // Scroll the action buttons into view above the keyboard
-                    actionButtons.postDelayed({
-                        val scrollView = findViewById<ScrollView>(android.R.id.content)
-                            ?.rootView?.findViewById<ScrollView>(R.id.mainScrollView)
-                        // Fallback: use requestRectangleOnScreen
-                        actionButtons.requestRectangleOnScreen(
-                            android.graphics.Rect(0, 0, actionButtons.width, actionButtons.height),
-                            false
-                        )
-                    }, 350)
+            try {
+                if (hasFocus) {
+                    inputField.setBackgroundResource(R.drawable.input_background_focused)
+                    if (!isLiveMode) {
+                        // Scroll the page all the way down so buttons are above the keyboard
+                        mainScrollView.postDelayed({
+                            mainScrollView.fullScroll(View.FOCUS_DOWN)
+                        }, 350)
+                    }
+                } else {
+                    inputField.setBackgroundResource(R.drawable.input_background)
                 }
-            } else {
-                inputField.setBackgroundResource(R.drawable.input_background)
+            } catch (e: Exception) {
+                hidService.log("E", "Focus handler error: ${e.stackTraceToString().take(500)}")
             }
         }
 
