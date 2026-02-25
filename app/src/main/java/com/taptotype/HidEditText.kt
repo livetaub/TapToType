@@ -90,7 +90,11 @@ class HidEditText @JvmOverloads constructor(
                     isDragging = true
                 }
                 if (isDragging) {
-                    scrollBy(0, dy.toInt())
+                    // Clamp scroll to content bounds
+                    val maxScroll = (layout?.height ?: 0) + totalPaddingTop + totalPaddingBottom - height
+                    val clampedMax = maxScroll.coerceAtLeast(0)
+                    val newScrollY = (scrollY + dy.toInt()).coerceIn(0, clampedMax)
+                    scrollTo(scrollX, newScrollY)
                     touchStartY = event.y
                 }
                 return true

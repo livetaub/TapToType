@@ -4,11 +4,14 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Typeface
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.text.method.ScrollingMovementMethod
@@ -35,6 +38,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_THEME_MODE = "theme_mode"
         private const val PREF_SHIFT_ENTER = "enter_is_shift"
         private const val PREF_SAVED_DEVICES = "saved_devices"
+        private const val PREF_DEFAULT_MODE = "default_mode"
     }
 
     private lateinit var hidService: BluetoothHidService
@@ -59,6 +63,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeSpinner: Spinner
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
+
+    // Live echo UI
+    private lateinit var liveEchoScroll: ScrollView
+    private lateinit var liveEchoText: TextView
+    private lateinit var liveEchoHint: TextView
+    private val echoChars = mutableListOf<Char>()
+    private val echoHandler = Handler(Looper.getMainLooper())
 
     private var isLiveMode: Boolean = true
     private var previousText: String = ""
@@ -176,6 +187,16 @@ class MainActivity : AppCompatActivity() {
         modeSpinner = findViewById(R.id.modeSpinner)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
+        liveEchoScroll = findViewById(R.id.liveEchoScroll)
+        liveEchoText = findViewById(R.id.liveEchoText)
+        liveEchoHint = findViewById(R.id.liveEchoHint)
+
+        // Tap the echo area to focus the hidden input field & show keyboard
+        liveEchoScroll.setOnClickListener {
+            inputField.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(inputField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
 
         hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -190,6 +211,17 @@ class MainActivity : AppCompatActivity() {
         // NOTE: We do NOT call hidService.cleanup() here.
         // The BT connection must survive Activity recreation, backgrounding, and screen lock.
         // Cleanup only happens on explicit user disconnect.
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Reload settings that may have been changed in SettingsActivity
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        hidService.useShiftEnter = prefs.getBoolean(PREF_SHIFT_ENTER, true)
+        val savedMode = prefs.getInt(PREF_DEFAULT_MODE, 0)
+        if (modeSpinner.selectedItemPosition != savedMode) {
+            modeSpinner.setSelection(savedMode)
+        }
     }
 
     // ============================================================
@@ -257,11 +289,16 @@ class MainActivity : AppCompatActivity() {
         val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modeOptions)
         spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         modeSpinner.adapter = spinnerAdapter
-        modeSpinner.setSelection(0) // Default: Live Typing
+        // Restore saved mode
+        val savedMode = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getInt(PREF_DEFAULT_MODE, 0)
+        modeSpinner.setSelection(savedMode)
         modeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
                 isLiveMode = (position == 0)
                 updateModeUI(isLiveMode)
+                // Persist mode selection
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit().putInt(PREF_DEFAULT_MODE, position).apply()
             }
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
@@ -294,7 +331,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         settingsButton.setOnClickListener {
-            showSettingsDialog()
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         // Connected state: ellipsis menu
@@ -332,18 +369,26 @@ class MainActivity : AppCompatActivity() {
                     // Live mode: send keystrokes immediately
                     if (currentText.length < previousText.length) {
                         val deletedCount = previousText.length - currentText.length
-                        repeat(deletedCount) { hidService.sendBackspace() }
+                        repeat(deletedCount) {
+                            hidService.sendBackspace()
+                            addEchoChar('⌫')
+                        }
                     } else if (currentText.length > previousText.length) {
                         val newChars = currentText.substring(previousText.length)
                         for (char in newChars) {
                             if (char == '\n') {
-                                // Route through sendEnter() which respects useShiftEnter setting
                                 hidService.sendEnter()
+                                addEchoChar('↵')
                             } else {
                                 hidService.sendKeyPress(char)
+                                addEchoChar(char)
                             }
                         }
                     }
+                    // Clear the field — live mode doesn't accumulate text
+                    ignoreTextChanges = true
+                    inputField.text?.clear()
+                    ignoreTextChanges = false
                 }
                 // Type & Send mode: text stays local until Send is tapped
 
@@ -368,13 +413,49 @@ class MainActivity : AppCompatActivity() {
     private fun updateModeUI(isLive: Boolean) {
         if (isLive) {
             sendButton.visibility = View.GONE
-            inputField.hint = "Start typing — keystrokes sent live…"
+            clearButton.visibility = View.GONE
+            inputField.alpha = 0f
             inputField.lockCursorToEnd = true
+            liveEchoScroll.visibility = View.VISIBLE
+            clearEcho()
         } else {
             sendButton.visibility = View.VISIBLE
+            clearButton.visibility = View.VISIBLE
+            inputField.alpha = 1f
             inputField.hint = "Type your message, then tap Send…"
             inputField.lockCursorToEnd = false
+            liveEchoScroll.visibility = View.GONE
         }
+    }
+
+    private fun addEchoChar(char: Char) {
+        echoChars.add(char)
+        refreshEchoDisplay()
+        liveEchoHint.visibility = View.GONE
+        // Schedule removal after 2 seconds
+        echoHandler.postDelayed({
+            if (echoChars.isNotEmpty()) {
+                echoChars.removeAt(0)
+                refreshEchoDisplay()
+                if (echoChars.isEmpty()) {
+                    liveEchoHint.visibility = View.VISIBLE
+                }
+            }
+        }, 2000L)
+    }
+
+    private fun refreshEchoDisplay() {
+        val display = echoChars.joinToString("  ")
+        liveEchoText.text = display
+        liveEchoScroll.post {
+            liveEchoScroll.fullScroll(ScrollView.FOCUS_DOWN)
+        }
+    }
+
+    private fun clearEcho() {
+        echoChars.clear()
+        liveEchoText.text = ""
+        liveEchoHint.visibility = View.VISIBLE
     }
 
     @SuppressLint("MissingPermission")
@@ -450,7 +531,7 @@ class MainActivity : AppCompatActivity() {
             )) { _, which ->
                 when (which) {
                     0 -> confirmDisconnect()
-                    1 -> showSettingsDialog()
+                    1 -> startActivity(Intent(this, SettingsActivity::class.java))
                     2 -> showDiagnostics()
                 }
             }

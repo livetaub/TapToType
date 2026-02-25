@@ -51,6 +51,7 @@
     <color name="switch_track">#FFD0D0DE</color>
     <color name="divider">#FFEAEAF0</color>
     <color name="card_shadow">#0D000020</color>
+    <color name="icon_tint">#FF5C5C7A</color>
 
     <!-- System bars -->
     <color name="status_bar">#FFF5F5FA</color>

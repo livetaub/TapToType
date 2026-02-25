@@ -255,27 +255,73 @@
                     android:fontFamily="sans-serif" />
             </LinearLayout>
 
-            <!-- Text Input -->
-            <com.taptotype.HidEditText
-                android:id="@+id/inputField"
+            <!-- Input Area (FrameLayout to overlay echo in live mode) -->
+            <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:minHeight="220dp"
-                android:background="@drawable/input_background"
-                android:padding="20dp"
-                android:textSize="17sp"
-                android:textColor="@color/text_primary"
-                android:textColorHint="@color/text_tertiary"
-                android:hint="Start typing — keystrokes sent live..."
-                android:fontFamily="sans-serif"
-                android:gravity="top|start"
-                android:inputType="textMultiLine"
-                android:importantForAutofill="no"
-                android:lineSpacingExtra="6dp"
-                android:scrollbars="vertical"
-                android:overScrollMode="always"
-                tools:ignore="LabelFor" />
+                android:minHeight="220dp">
+
+                <!-- Hidden EditText (captures keyboard input in both modes) -->
+                <com.taptotype.HidEditText
+                    android:id="@+id/inputField"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@drawable/input_background"
+                    android:padding="20dp"
+                    android:textSize="17sp"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_tertiary"
+                    android:hint="Start typing — keystrokes sent live…"
+                    android:fontFamily="sans-serif"
+                    android:gravity="top|start"
+                    android:inputType="textMultiLine"
+                    android:importantForAutofill="no"
+                    android:lineSpacingExtra="6dp"
+                    android:scrollbars="vertical"
+                    android:overScrollMode="always"
+                    tools:ignore="LabelFor" />
+
+                <!-- Live Echo Display (shown only in live mode) -->
+                <ScrollView
+                    android:id="@+id/liveEchoScroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:fillViewport="true"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="bottom"
+                        android:padding="20dp">
+
+                        <TextView
+                            android:id="@+id/liveEchoText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:textSize="28sp"
+                            android:textColor="@color/text_tertiary"
+                            android:fontFamily="monospace"
+                            android:letterSpacing="0.05"
+                            android:gravity="start|bottom"
+                            android:lineSpacingExtra="8dp" />
+
+                        <TextView
+                            android:id="@+id/liveEchoHint"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Tap here, then start typing…"
+                            android:textSize="16sp"
+                            android:textColor="@color/text_tertiary"
+                            android:fontFamily="sans-serif"
+                            android:gravity="center"
+                            android:alpha="0.6"
+                            android:paddingTop="40dp" />
+                    </LinearLayout>
+                </ScrollView>
+            </FrameLayout>
 
             <!-- Action Buttons -->
             <LinearLayout
