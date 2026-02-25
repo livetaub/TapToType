@@ -64,9 +64,11 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeHelperText: TextView
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
+    private lateinit var actionButtons: LinearLayout
 
     // Live echo UI
-    private lateinit var liveEchoScroll: ScrollView
+    private lateinit var liveEchoScroll: LinearLayout
+    private lateinit var liveEchoInnerScroll: ScrollView
     private lateinit var liveEchoText: TextView
     private lateinit var liveEchoHint: TextView
     private val echoChars = mutableListOf<Char>()
@@ -189,16 +191,22 @@ class MainActivity : AppCompatActivity() {
         modeHelperText = findViewById(R.id.modeHelperText)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
+        actionButtons = findViewById(R.id.actionButtons)
         liveEchoScroll = findViewById(R.id.liveEchoScroll)
+        liveEchoInnerScroll = findViewById(R.id.liveEchoInnerScroll)
         liveEchoText = findViewById(R.id.liveEchoText)
         liveEchoHint = findViewById(R.id.liveEchoHint)
 
-        // Tap the echo area to focus the hidden input field & show keyboard
-        liveEchoScroll.setOnClickListener {
+        // Tap anywhere on the echo area to focus the hidden input field & show keyboard
+        val showKeyboard: () -> Unit = {
             inputField.requestFocus()
-            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
+                    as android.view.inputmethod.InputMethodManager
             imm.showSoftInput(inputField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
         }
+        liveEchoScroll.setOnClickListener { showKeyboard() }
+        liveEchoHint.setOnClickListener { showKeyboard() }
+        liveEchoInnerScroll.setOnClickListener { showKeyboard() }
 
         hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -342,11 +350,18 @@ class MainActivity : AppCompatActivity() {
         inputField.setOnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
                 inputField.setBackgroundResource(R.drawable.input_background_focused)
-                clearButton.postDelayed({
-                    clearButton.requestRectangleOnScreen(
-                        android.graphics.Rect(0, 0, clearButton.width, clearButton.height)
-                    )
-                }, 300)
+                if (!isLiveMode) {
+                    // Scroll the action buttons into view above the keyboard
+                    actionButtons.postDelayed({
+                        val scrollView = findViewById<ScrollView>(android.R.id.content)
+                            ?.rootView?.findViewById<ScrollView>(R.id.mainScrollView)
+                        // Fallback: use requestRectangleOnScreen
+                        actionButtons.requestRectangleOnScreen(
+                            android.graphics.Rect(0, 0, actionButtons.width, actionButtons.height),
+                            false
+                        )
+                    }, 350)
+                }
             } else {
                 inputField.setBackgroundResource(R.drawable.input_background)
             }
@@ -397,7 +412,10 @@ class MainActivity : AppCompatActivity() {
         })
         // Backspace on empty field — only send to PC in live mode
         inputField.onEmptyBackspace = {
-            if (isLiveMode && hidService.isConnected) hidService.sendBackspace()
+            if (isLiveMode && hidService.isConnected) {
+                hidService.sendBackspace()
+                addEchoChar('⌫')
+            }
         }
 
         // Immediately sync UI with current service state
@@ -440,15 +458,11 @@ class MainActivity : AppCompatActivity() {
     private fun addEchoChar(char: Char) {
         echoChars.add(char)
         refreshEchoDisplay()
-        liveEchoHint.visibility = View.GONE
         // Schedule removal after 2 seconds
         echoHandler.postDelayed({
             if (echoChars.isNotEmpty()) {
                 echoChars.removeAt(0)
                 refreshEchoDisplay()
-                if (echoChars.isEmpty()) {
-                    liveEchoHint.visibility = View.VISIBLE
-                }
             }
         }, 2000L)
     }
@@ -456,15 +470,14 @@ class MainActivity : AppCompatActivity() {
     private fun refreshEchoDisplay() {
         val display = echoChars.joinToString("  ")
         liveEchoText.text = display
-        liveEchoScroll.post {
-            liveEchoScroll.fullScroll(ScrollView.FOCUS_DOWN)
+        liveEchoInnerScroll.post {
+            liveEchoInnerScroll.fullScroll(ScrollView.FOCUS_DOWN)
         }
     }
 
     private fun clearEcho() {
         echoChars.clear()
         liveEchoText.text = ""
-        liveEchoHint.visibility = View.VISIBLE
     }
 
     @SuppressLint("MissingPermission")

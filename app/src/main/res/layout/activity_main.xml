@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mainScrollView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/background"
@@ -276,13 +277,13 @@
             <FrameLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:minHeight="240dp">
+                android:minHeight="120dp">
 
-                <!-- Hidden EditText (captures keyboard input in both modes) -->
                 <com.taptotype.HidEditText
                     android:id="@+id/inputField"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minLines="3"
                     android:background="@drawable/input_background"
                     android:padding="20dp"
                     android:textSize="17sp"
@@ -299,48 +300,61 @@
                     tools:ignore="LabelFor" />
 
                 <!-- Live Echo Display (shown only in live mode) -->
-                <ScrollView
+                <LinearLayout
                     android:id="@+id/liveEchoScroll"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:fillViewport="true"
+                    android:orientation="vertical"
                     android:visibility="gone">
 
-                    <LinearLayout
+                    <!-- Scrolling echo chars -->
+                    <ScrollView
+                        android:id="@+id/liveEchoInnerScroll"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:fillViewport="true">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:gravity="bottom"
+                            android:padding="20dp">
+
+                            <TextView
+                                android:id="@+id/liveEchoText"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:textSize="28sp"
+                                android:textColor="@color/text_tertiary"
+                                android:fontFamily="monospace"
+                                android:letterSpacing="0.05"
+                                android:gravity="start|bottom"
+                                android:lineSpacingExtra="8dp" />
+                        </LinearLayout>
+                    </ScrollView>
+
+                    <!-- Always-visible tap hint -->
+                    <TextView
+                        android:id="@+id/liveEchoHint"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="bottom"
-                        android:padding="20dp">
-
-                        <TextView
-                            android:id="@+id/liveEchoText"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:textSize="28sp"
-                            android:textColor="@color/text_tertiary"
-                            android:fontFamily="monospace"
-                            android:letterSpacing="0.05"
-                            android:gravity="start|bottom"
-                            android:lineSpacingExtra="8dp" />
-
-                        <TextView
-                            android:id="@+id/liveEchoHint"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:text="Tap here, then start typing…"
-                            android:textSize="16sp"
-                            android:textColor="@color/text_tertiary"
-                            android:fontFamily="sans-serif"
-                            android:gravity="center"
-                            android:alpha="0.6"
-                            android:paddingTop="40dp" />
-                    </LinearLayout>
-                </ScrollView>
+                        android:text="⌨  Tap anywhere to open keyboard"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_tertiary"
+                        android:fontFamily="sans-serif"
+                        android:gravity="center"
+                        android:alpha="0.7"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="12dp"
+                        android:background="@color/surface_sunken" />
+                </LinearLayout>
             </FrameLayout>
 
             <!-- Action Buttons -->
             <LinearLayout
+                android:id="@+id/actionButtons"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
