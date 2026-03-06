@@ -12,16 +12,23 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(keystorePropertiesFile.inputStream())
 }
 
+// Load version properties
+val versionPropertiesFile = rootProject.file("version.properties")
+val versionProperties = Properties()
+if (versionPropertiesFile.exists()) {
+    versionProperties.load(versionPropertiesFile.inputStream())
+}
+
 android {
     namespace = "com.taptotype"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.taptotype"
         minSdk = 28
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = (versionProperties["VERSION_CODE"] as String?)?.toIntOrNull() ?: 1
+        versionName = versionProperties["VERSION_NAME"] as String? ?: "1.0.0"
     }
 
     signingConfigs {

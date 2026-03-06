@@ -4,6 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
+    android:fitsSystemWindows="true"
     android:background="@color/background">
 
     <!-- Toolbar -->
@@ -429,6 +430,54 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Share this app -->
+            <LinearLayout
+                android:id="@+id/settingShare"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="?attr/selectableItemBackground"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:clickable="true"
+                android:focusable="true">
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:src="@drawable/ic_share"
+                    android:scaleType="centerInside"
+                    android:padding="8dp"
+                    android:layout_marginEnd="16dp" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Share this app"
+                        android:textSize="16sp"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="sans-serif" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tell a friend about TapToType"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_secondary"
+                        android:fontFamily="sans-serif"
+                        android:paddingTop="2dp" />
+                </LinearLayout>
+            </LinearLayout>
+
             <!-- Divider -->
             <View
                 android:layout_width="match_parent"
@@ -466,7 +515,7 @@
                 <ImageView
                     android:layout_width="40dp"
                     android:layout_height="40dp"
-                    android:src="@drawable/ic_logo_inline"
+                    android:src="@mipmap/ic_launcher"
                     android:scaleType="centerInside"
                     android:padding="8dp"
                     android:layout_marginEnd="16dp" />

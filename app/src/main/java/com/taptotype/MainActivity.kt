@@ -39,6 +39,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_SHIFT_ENTER = "enter_is_shift"
         private const val PREF_SAVED_DEVICES = "saved_devices"
         private const val PREF_DEFAULT_MODE = "default_mode"
+        private const val MAX_HISTORY = 5
     }
 
     private lateinit var hidService: BluetoothHidService
@@ -64,15 +65,18 @@ class MainActivity : AppCompatActivity() {
     private lateinit var modeHelperText: TextView
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
+    private lateinit var historyButton: ImageButton
     private lateinit var actionButtons: LinearLayout
+
+    // Compose mode history (in-memory only)
+    private val composeHistory = mutableListOf<String>()
 
     // Live echo UI
     private lateinit var liveEchoScroll: LinearLayout
-    private lateinit var liveEchoInnerScroll: ScrollView
     private lateinit var liveEchoText: TextView
-    private lateinit var liveEchoHint: TextView
-    private val echoChars = mutableListOf<Char>()
+    private lateinit var liveEchoHint: Button
     private val echoHandler = Handler(Looper.getMainLooper())
+    private val echoClearRunnable = Runnable { liveEchoText.text = "" }
 
     private var isLiveMode: Boolean = true
     private var previousText: String = ""
@@ -191,9 +195,9 @@ class MainActivity : AppCompatActivity() {
         modeHelperText = findViewById(R.id.modeHelperText)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
+        historyButton = findViewById(R.id.historyButton)
         actionButtons = findViewById(R.id.actionButtons)
         liveEchoScroll = findViewById(R.id.liveEchoScroll)
-        liveEchoInnerScroll = findViewById(R.id.liveEchoInnerScroll)
         liveEchoText = findViewById(R.id.liveEchoText)
         liveEchoHint = findViewById(R.id.liveEchoHint)
 
@@ -205,8 +209,8 @@ class MainActivity : AppCompatActivity() {
             imm.showSoftInput(inputField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
         }
         liveEchoScroll.setOnClickListener { showKeyboard() }
+        liveEchoText.setOnClickListener { showKeyboard() }
         liveEchoHint.setOnClickListener { showKeyboard() }
-        liveEchoInnerScroll.setOnClickListener { showKeyboard() }
 
         hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -240,10 +244,10 @@ class MainActivity : AppCompatActivity() {
         // Reload settings that may have been changed in SettingsActivity
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         hidService.useShiftEnter = prefs.getBoolean(PREF_SHIFT_ENTER, true)
-        val savedMode = prefs.getInt(PREF_DEFAULT_MODE, 0)
-        if (modeSpinner.selectedItemPosition != savedMode) {
-            modeSpinner.setSelection(savedMode)
-        }
+        // Note: We intentionally do NOT reset the mode spinner here.
+        // The default mode from settings is only applied on fresh app launch (in setupUI).
+        // Resetting it on every resume would override the user's current mode selection
+        // (e.g. after screen timeout or returning from another app).
     }
 
     // ============================================================
@@ -327,6 +331,7 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 if (hidService.isConnected) {
                     hidService.sendString(text)
+                    addToHistory(text)
                     ignoreTextChanges = true
                     inputField.text?.clear()
                     previousText = ""
@@ -343,6 +348,10 @@ class MainActivity : AppCompatActivity() {
             inputField.text?.clear()
             previousText = ""
             ignoreTextChanges = false
+        }
+
+        historyButton.setOnClickListener {
+            showComposeHistory()
         }
 
         addNewDeviceButton.setOnClickListener {
@@ -443,6 +452,7 @@ class MainActivity : AppCompatActivity() {
         if (isLive) {
             sendButton.visibility = View.GONE
             clearButton.visibility = View.GONE
+            historyButton.visibility = View.GONE
             inputField.alpha = 0f
             inputField.lockCursorToEnd = true
             liveEchoScroll.visibility = View.VISIBLE
@@ -458,6 +468,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             sendButton.visibility = View.VISIBLE
             clearButton.visibility = View.VISIBLE
+            historyButton.visibility = if (composeHistory.isNotEmpty()) View.VISIBLE else View.GONE
             inputField.alpha = 1f
             inputField.hint = "Type your message, then tap Send…"
             inputField.lockCursorToEnd = false
@@ -467,28 +478,59 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addEchoChar(char: Char) {
-        echoChars.add(char)
-        refreshEchoDisplay()
-        // Schedule removal after 2 seconds
-        echoHandler.postDelayed({
-            if (echoChars.isNotEmpty()) {
-                echoChars.removeAt(0)
-                refreshEchoDisplay()
-            }
-        }, 2000L)
-    }
-
-    private fun refreshEchoDisplay() {
-        val display = echoChars.joinToString("  ")
-        liveEchoText.text = display
-        liveEchoInnerScroll.post {
-            liveEchoInnerScroll.fullScroll(ScrollView.FOCUS_DOWN)
-        }
+        // Show only the latest character, replacing any previous one
+        liveEchoText.text = char.toString()
+        // Cancel any pending clear and schedule a new one after 2 seconds
+        echoHandler.removeCallbacks(echoClearRunnable)
+        echoHandler.postDelayed(echoClearRunnable, 2000L)
     }
 
     private fun clearEcho() {
-        echoChars.clear()
+        echoHandler.removeCallbacks(echoClearRunnable)
         liveEchoText.text = ""
+    }
+
+    // ============================================================
+    // Compose History
+    // ============================================================
+
+    private fun addToHistory(text: String) {
+        // Remove duplicate if already in history (move to top)
+        composeHistory.remove(text)
+        // Add to the front (most recent first)
+        composeHistory.add(0, text)
+        // Cap at MAX_HISTORY
+        while (composeHistory.size > MAX_HISTORY) {
+            composeHistory.removeAt(composeHistory.size - 1)
+        }
+        // Show the history button now that there's history
+        if (!isLiveMode) {
+            historyButton.visibility = View.VISIBLE
+        }
+    }
+
+    private fun showComposeHistory() {
+        if (composeHistory.isEmpty()) {
+            Toast.makeText(this, "No history yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Truncate display labels for the dialog (show first 80 chars)
+        val displayItems = composeHistory.map { msg ->
+            if (msg.length > 80) msg.take(80) + "…" else msg
+        }.toTypedArray()
+
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("Recent Messages")
+            .setItems(displayItems) { _, which ->
+                ignoreTextChanges = true
+                inputField.setText(composeHistory[which])
+                inputField.setSelection(inputField.text?.length ?: 0)
+                previousText = composeHistory[which]
+                ignoreTextChanges = false
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     @SuppressLint("MissingPermission")

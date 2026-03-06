@@ -112,6 +112,17 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<LinearLayout>(R.id.settingContact).setOnClickListener {
             showContactForm()
         }
+
+        // Share this app
+        findViewById<LinearLayout>(R.id.settingShare).setOnClickListener {
+            val playStoreUrl = "https://play.google.com/store/apps/details?id=$packageName"
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "TapToType — Bluetooth Keyboard")
+                putExtra(Intent.EXTRA_TEXT, "Turn your phone into a Bluetooth keyboard for your PC!\n\n$playStoreUrl")
+            }
+            startActivity(Intent.createChooser(shareIntent, "Share TapToType"))
+        }
     }
 
     private fun showThemeSelector() {
