@@ -222,7 +222,8 @@
         <LinearLayout
             android:id="@+id/typingSection"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
+            android:layout_weight="1"
             android:orientation="vertical"
             android:visibility="gone">
 
@@ -274,17 +275,30 @@
                     android:paddingStart="2dp" />
             </LinearLayout>
 
+            <!-- Tap to show keyboard hint — visible only in live mode when keyboard is hidden -->
+            <Button
+                android:id="@+id/liveEchoHint"
+                style="@style/SecondaryButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Tap here to display keyboard"
+                android:textSize="14sp"
+                android:fontFamily="sans-serif-medium"
+                android:gravity="center"
+                android:drawableStart="@drawable/ic_keyboard"
+                android:drawablePadding="10dp"
+                android:visibility="gone" />
+
             <!-- Input Area (FrameLayout to overlay echo in live mode) -->
             <FrameLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="120dp">
+                android:layout_height="0dp"
+                android:layout_weight="1">
 
                 <com.taptotype.HidEditText
                     android:id="@+id/inputField"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minLines="3"
+                    android:layout_height="match_parent"
                     android:background="@drawable/input_background"
                     android:padding="20dp"
                     android:textSize="17sp"
@@ -312,26 +326,12 @@
                     <TextView
                         android:id="@+id/liveEchoText"
                         android:layout_width="match_parent"
-                        android:layout_height="0dp"
-                        android:layout_weight="1"
+                        android:layout_height="match_parent"
                         android:textSize="64sp"
                         android:textColor="@color/text_tertiary"
                         android:fontFamily="monospace"
                         android:gravity="center"
                         android:padding="20dp" />
-
-                    <!-- Always-visible tap hint button -->
-                    <Button
-                        android:id="@+id/liveEchoHint"
-                        style="@style/SecondaryButton"
-                        android:layout_width="match_parent"
-                        android:layout_height="48dp"
-                        android:text="Tap here to display keyboard"
-                        android:textSize="14sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:gravity="center"
-                        android:drawableStart="@drawable/ic_keyboard"
-                        android:drawablePadding="10dp" />
                 </LinearLayout>
             </FrameLayout>
 
@@ -344,17 +344,17 @@
                 android:gravity="center"
                 android:paddingTop="12dp">
 
-                <ImageButton
-                    android:id="@+id/sendButton"
-                    android:layout_width="56dp"
+                <Button
+                    android:id="@+id/clearButton"
+                    style="@style/SecondaryButton"
+                    android:layout_width="0dp"
                     android:layout_height="56dp"
-                    android:src="@drawable/ic_send"
-                    android:background="@drawable/button_primary_bg"
-                    android:scaleType="centerInside"
-                    android:contentDescription="Send"
-                    android:visibility="gone"
-                    android:layout_marginEnd="12dp"
-                    android:padding="16dp" />
+                    android:layout_weight="1"
+                    android:text="Clear"
+                    android:textColor="@color/button_secondary_text"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginEnd="12dp" />
 
                 <ImageButton
                     android:id="@+id/historyButton"
@@ -368,16 +368,16 @@
                     android:layout_marginEnd="12dp"
                     android:padding="14dp" />
 
-                <Button
-                    android:id="@+id/clearButton"
-                    style="@style/SecondaryButton"
-                    android:layout_width="0dp"
+                <ImageButton
+                    android:id="@+id/sendButton"
+                    android:layout_width="56dp"
                     android:layout_height="56dp"
-                    android:layout_weight="1"
-                    android:text="Clear"
-                    android:textColor="@color/button_secondary_text"
-                    android:textSize="15sp"
-                    android:fontFamily="sans-serif-medium" />
+                    android:src="@drawable/ic_send"
+                    android:background="@drawable/button_primary_bg"
+                    android:scaleType="centerInside"
+                    android:contentDescription="Send"
+                    android:visibility="gone"
+                    android:padding="16dp" />
             </LinearLayout>
 
         </LinearLayout>

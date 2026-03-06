@@ -83,6 +83,7 @@ class MainActivity : AppCompatActivity() {
     private var wizardDialog: AlertDialog? = null
     private var hasPromptedSave = false  // prevent double save-prompt
     private var ignoreTextChanges = false // suppress TextWatcher during programmatic clears
+    private var isKeyboardVisible = false
 
     // Wizard UI refs (held for refreshing from callbacks)
     private var wizardStatusDot: View? = null
@@ -229,6 +230,20 @@ class MainActivity : AppCompatActivity() {
 
         setupUI()
         checkPermissions()
+
+        // Keyboard visibility listener — show/hide the live mode hint button
+        val rootView = findViewById<View>(android.R.id.content)
+        rootView.viewTreeObserver.addOnGlobalLayoutListener {
+            val rect = android.graphics.Rect()
+            rootView.getWindowVisibleDisplayFrame(rect)
+            val screenHeight = rootView.rootView.height
+            val keyboardHeight = screenHeight - rect.bottom
+            val wasVisible = isKeyboardVisible
+            isKeyboardVisible = keyboardHeight > screenHeight * 0.15
+            if (wasVisible != isKeyboardVisible) {
+                updateHintVisibility()
+            }
+        }
     }
 
     override fun onDestroy() {
@@ -367,18 +382,11 @@ class MainActivity : AppCompatActivity() {
             showConnectedMenu()
         }
 
-        // Focus state background + scroll to expose action buttons
-        val mainScrollView = findViewById<ScrollView>(R.id.mainScrollView)
+        // Focus state background
         inputField.setOnFocusChangeListener { _, hasFocus ->
             try {
                 if (hasFocus) {
                     inputField.setBackgroundResource(R.drawable.input_background_focused)
-                    if (!isLiveMode) {
-                        // Scroll the page all the way down so buttons are above the keyboard
-                        mainScrollView.postDelayed({
-                            mainScrollView.fullScroll(View.FOCUS_DOWN)
-                        }, 350)
-                    }
                 } else {
                     inputField.setBackgroundResource(R.drawable.input_background)
                 }
@@ -458,22 +466,34 @@ class MainActivity : AppCompatActivity() {
             liveEchoScroll.visibility = View.VISIBLE
             modeHelperText.text = "Each keystroke is sent to your PC instantly"
             clearEcho()
-            // Auto-focus and show keyboard
-            inputField.requestFocus()
-            inputField.postDelayed({
-                val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
-                        as android.view.inputmethod.InputMethodManager
-                imm.showSoftInput(inputField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
-            }, 200)
+            updateHintVisibility()
+            // Auto-focus and show keyboard only if typing section is visible (connected)
+            if (typingSection.visibility == View.VISIBLE) {
+                inputField.requestFocus()
+                inputField.postDelayed({
+                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
+                            as android.view.inputmethod.InputMethodManager
+                    imm.showSoftInput(inputField, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+                }, 200)
+            }
         } else {
             sendButton.visibility = View.VISIBLE
             clearButton.visibility = View.VISIBLE
-            historyButton.visibility = if (composeHistory.isNotEmpty()) View.VISIBLE else View.GONE
+            historyButton.visibility = View.VISIBLE
             inputField.alpha = 1f
             inputField.hint = "Type your message, then tap Send…"
             inputField.lockCursorToEnd = false
             liveEchoScroll.visibility = View.GONE
             modeHelperText.text = "Write your message first, then send it all at once"
+            liveEchoHint.visibility = View.GONE
+        }
+    }
+
+    private fun updateHintVisibility() {
+        if (isLiveMode && !isKeyboardVisible && typingSection.visibility == View.VISIBLE) {
+            liveEchoHint.visibility = View.VISIBLE
+        } else {
+            liveEchoHint.visibility = View.GONE
         }
     }
 
@@ -503,15 +523,11 @@ class MainActivity : AppCompatActivity() {
         while (composeHistory.size > MAX_HISTORY) {
             composeHistory.removeAt(composeHistory.size - 1)
         }
-        // Show the history button now that there's history
-        if (!isLiveMode) {
-            historyButton.visibility = View.VISIBLE
-        }
     }
 
     private fun showComposeHistory() {
         if (composeHistory.isEmpty()) {
-            Toast.makeText(this, "No history yet", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "No history yet — sent messages will appear here", Toast.LENGTH_SHORT).show()
             return
         }
 
