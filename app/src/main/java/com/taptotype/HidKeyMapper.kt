@@ -84,6 +84,7 @@ object HidKeyMapper {
 
     // Modifier constants
     private const val MOD_NONE: Byte = 0x00
+    private const val MOD_LEFT_CTRL: Byte = 0x01
     private const val MOD_LEFT_SHIFT: Byte = 0x02
 
     /**
@@ -263,6 +264,18 @@ object HidKeyMapper {
             MOD_LEFT_SHIFT,
             0x00,
             KEY_ENTER,
+            0x00, 0x00, 0x00, 0x00, 0x00
+        )
+    }
+
+    /**
+     * Creates a Ctrl+V key-down report (paste from clipboard).
+     */
+    fun createCtrlVReport(): ByteArray {
+        return byteArrayOf(
+            MOD_LEFT_CTRL,
+            0x00,
+            KEY_V,
             0x00, 0x00, 0x00, 0x00, 0x00
         )
     }

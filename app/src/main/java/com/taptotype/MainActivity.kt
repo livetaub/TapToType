@@ -4,6 +4,8 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -39,6 +41,8 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_SHIFT_ENTER = "enter_is_shift"
         private const val PREF_SAVED_DEVICES = "saved_devices"
         private const val PREF_DEFAULT_MODE = "default_mode"
+        private const val PREF_COMPOSE_SEND_MODE = "compose_send_mode" // 0 = type, 1 = paste
+        private const val PREF_KEYSTROKE_DELAY = "keystroke_delay_ms" // 0, 5, 10, ... 50
         private const val MAX_HISTORY = 5
     }
 
@@ -216,6 +220,10 @@ class MainActivity : AppCompatActivity() {
         hidService = BluetoothHidService.getInstance(this)
         hidService.useShiftEnter = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .getBoolean(PREF_SHIFT_ENTER, true)
+        hidService.composeSendMode = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getInt(PREF_COMPOSE_SEND_MODE, 0)
+        hidService.keystrokeDelayMs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getLong(PREF_KEYSTROKE_DELAY, 0L)
 
         // Global crash handler — logs crash to in-app log for diagnostics
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -230,6 +238,10 @@ class MainActivity : AppCompatActivity() {
 
         setupUI()
         checkPermissions()
+
+        // Prevent keyboard from auto-opening on the connection page
+        // The inputField steals focus on launch; suppress the keyboard until typing page is shown
+        window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
 
         // Keyboard visibility listener — show/hide the live mode hint button
         val rootView = findViewById<View>(android.R.id.content)
@@ -259,6 +271,8 @@ class MainActivity : AppCompatActivity() {
         // Reload settings that may have been changed in SettingsActivity
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
         hidService.useShiftEnter = prefs.getBoolean(PREF_SHIFT_ENTER, true)
+        hidService.composeSendMode = prefs.getInt(PREF_COMPOSE_SEND_MODE, 0)
+        hidService.keystrokeDelayMs = prefs.getLong(PREF_KEYSTROKE_DELAY, 0L)
         // Note: We intentionally do NOT reset the mode spinner here.
         // The default mode from settings is only applied on fresh app launch (in setupUI).
         // Resetting it on every resume would override the user's current mode selection
@@ -345,7 +359,15 @@ class MainActivity : AppCompatActivity() {
             val text = inputField.text.toString()
             if (text.isNotEmpty()) {
                 if (hidService.isConnected) {
-                    hidService.sendString(text)
+                    if (hidService.composeSendMode == 1) {
+                        // Paste mode: copy to Android clipboard, then send Ctrl+V
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText("TapToType", text))
+                        hidService.sendPaste()
+                    } else {
+                        // Type mode: send keystroke by keystroke
+                        hidService.sendString(text)
+                    }
                     addToHistory(text)
                     ignoreTextChanges = true
                     inputField.text?.clear()
@@ -500,6 +522,20 @@ class MainActivity : AppCompatActivity() {
     private fun addEchoChar(char: Char) {
         // Show only the latest character, replacing any previous one
         liveEchoText.text = char.toString()
+
+        // Subtle pop-in animation for every keystroke
+        liveEchoText.animate().cancel()
+        liveEchoText.scaleX = 0.8f
+        liveEchoText.scaleY = 0.8f
+        liveEchoText.alpha = 0f
+        liveEchoText.animate()
+            .scaleX(1f)
+            .scaleY(1f)
+            .alpha(1f)
+            .setDuration(150)
+            .setInterpolator(DecelerateInterpolator())
+            .start()
+
         // Cancel any pending clear and schedule a new one after 2 seconds
         echoHandler.removeCallbacks(echoClearRunnable)
         echoHandler.postDelayed(echoClearRunnable, 2000L)
@@ -571,6 +607,12 @@ class MainActivity : AppCompatActivity() {
             fadeInView(connectedMenuButton)
             fadeInView(typingSection)
             wizardDialog?.dismiss()
+
+            // Now that typing section is visible, apply mode UI + auto-open keyboard
+            // Small delay to let the layout transition complete
+            typingSection.postDelayed({
+                updateModeUI(isLiveMode)
+            }, 300)
         } else {
             // Animated switch to disconnected state
             fadeOutView(connectedBar)

@@ -21,6 +21,8 @@ class SettingsActivity : AppCompatActivity() {
         const val PREF_THEME_MODE = "theme_mode"
         const val PREF_SHIFT_ENTER = "enter_is_shift"
         const val PREF_DEFAULT_MODE = "default_mode" // 0 = live, 1 = type & send
+        const val PREF_COMPOSE_SEND_MODE = "compose_send_mode" // 0 = type, 1 = paste
+        const val PREF_KEYSTROKE_DELAY = "keystroke_delay_ms" // 0, 5, 10, ... 50
     }
 
     private lateinit var hidService: BluetoothHidService
@@ -73,6 +75,20 @@ class SettingsActivity : AppCompatActivity() {
         val useShiftEnter = prefs.getBoolean(PREF_SHIFT_ENTER, true)
         findViewById<TextView>(R.id.settingEnterValue).text =
             if (useShiftEnter) "Line break (Shift+Enter)" else "Submit (Enter)"
+
+        // Compose send method
+        val composeSendMode = prefs.getInt(PREF_COMPOSE_SEND_MODE, 0)
+        findViewById<TextView>(R.id.settingComposeSendValue).text = when (composeSendMode) {
+            1 -> "Paste (instant via Ctrl+V)"
+            else -> "Type (keystroke by keystroke)"
+        }
+
+        // Keystroke delay
+        val keystrokeDelay = prefs.getLong(PREF_KEYSTROKE_DELAY, 0L)
+        findViewById<TextView>(R.id.settingKeystrokeDelayValue).text = when {
+            keystrokeDelay == 0L -> "0 ms (fastest)"
+            else -> "$keystrokeDelay ms"
+        }
     }
 
     private fun setupClickListeners() {
@@ -89,6 +105,16 @@ class SettingsActivity : AppCompatActivity() {
         // Enter key
         findViewById<LinearLayout>(R.id.settingEnterKey).setOnClickListener {
             showEnterKeySelector()
+        }
+
+        // Compose send method
+        findViewById<LinearLayout>(R.id.settingComposeSend).setOnClickListener {
+            showComposeSendSelector()
+        }
+
+        // Keystroke delay
+        findViewById<LinearLayout>(R.id.settingKeystrokeDelay).setOnClickListener {
+            showKeystrokeDelaySelector()
         }
 
         // Re-init BT
@@ -171,6 +197,74 @@ class SettingsActivity : AppCompatActivity() {
                 val useShift = (which == 1)
                 hidService.useShiftEnter = useShift
                 prefs.edit().putBoolean(PREF_SHIFT_ENTER, useShift).apply()
+                dialog.dismiss()
+                refreshValues()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showComposeSendSelector() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val current = prefs.getInt(PREF_COMPOSE_SEND_MODE, 0)
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("Compose send method")
+            .setSingleChoiceItems(
+                arrayOf(
+                    "Type (keystroke by keystroke)",
+                    "Paste (instant via Ctrl+V)"
+                ),
+                current
+            ) { dialog, which ->
+                hidService.composeSendMode = which
+                prefs.edit().putInt(PREF_COMPOSE_SEND_MODE, which).apply()
+                dialog.dismiss()
+                refreshValues()
+
+                if (which == 1) {
+                    // Show helpful info about paste mode requirements
+                    AlertDialog.Builder(this, R.style.DialogTheme)
+                        .setTitle("\uD83D\uDCCB  Paste mode")
+                        .setMessage(
+                            "Paste mode copies the text to your phone's clipboard, then " +
+                            "sends Ctrl+V to your PC.\n\n" +
+                            "For this to work, you need clipboard sync between your phone and PC. " +
+                            "The easiest way:\n\n" +
+                            "\u2022 Windows: Use \"Phone Link\" (built into Windows 10/11)\n" +
+                            "\u2022 Or enable Cloud Clipboard in Windows Settings → System → Clipboard\n\n" +
+                            "Once set up, your message will appear instantly on the PC!"
+                        )
+                        .setPositiveButton("Got it", null)
+                        .show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showKeystrokeDelaySelector() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        val currentDelay = prefs.getLong(PREF_KEYSTROKE_DELAY, 0L)
+
+        // Options: 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50
+        val delayValues = (0..50 step 5).map { it.toLong() }
+        val labels = delayValues.map { ms ->
+            when (ms) {
+                0L -> "0 ms (fastest)"
+                50L -> "50 ms (most reliable)"
+                else -> "$ms ms"
+            }
+        }.toTypedArray()
+
+        val currentIndex = delayValues.indexOf(currentDelay).coerceAtLeast(0)
+
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("Keystroke delay")
+            .setMessage("Extra delay between keystrokes in Compose → Type mode.\nIncrease if characters are dropped.")
+            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
+                val newDelay = delayValues[which]
+                hidService.keystrokeDelayMs = newDelay
+                prefs.edit().putLong(PREF_KEYSTROKE_DELAY, newDelay).apply()
                 dialog.dismiss()
                 refreshValues()
             }

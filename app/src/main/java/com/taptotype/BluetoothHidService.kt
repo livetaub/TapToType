@@ -15,8 +15,7 @@ class BluetoothHidService private constructor(private val context: Context) {
 
     companion object {
         private const val TAG = "BluetoothHidService"
-        private const val KEY_PRESS_DELAY_MS = 20L
-        private const val KEY_SEQUENCE_DELAY_MS = 30L
+        private const val KEY_PRESS_DELAY_MS = 5L
         private const val CONNECT_RETRY_DELAY_MS = 1500L
         private const val CONNECTION_TIMEOUT_MS = 10000L
         private const val REGISTER_TIMEOUT_MS = 3000L
@@ -51,6 +50,12 @@ class BluetoothHidService private constructor(private val context: Context) {
 
     /** When true, Enter key sends Shift+Enter (line break). Default: true */
     var useShiftEnter: Boolean = true
+
+    /** Compose send mode: 0 = Type (keystroke-by-keystroke), 1 = Paste (Ctrl+V, requires clipboard sync) */
+    var composeSendMode: Int = 0
+
+    /** Extra delay (ms) between keystrokes in compose Type mode. 0 = fastest, increase if characters are dropped. */
+    var keystrokeDelayMs: Long = 0L
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val keyExecutor = Executors.newSingleThreadExecutor()
@@ -825,6 +830,7 @@ class BluetoothHidService private constructor(private val context: Context) {
 
     fun sendString(text: String) {
         if (!isConnected) return
+        val seqDelay = keystrokeDelayMs // snapshot the current setting
         keyExecutor.execute {
             for (char in text) {
                 if (char == '\n') {
@@ -835,14 +841,33 @@ class BluetoothHidService private constructor(private val context: Context) {
                     hid.sendReport(device, 0, HidKeyMapper.createShiftEnterReport())
                     Thread.sleep(KEY_PRESS_DELAY_MS)
                     hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
-                    Thread.sleep(KEY_SEQUENCE_DELAY_MS)
+                    if (seqDelay > 0) Thread.sleep(seqDelay)
                 } else {
                     val keyEvent = HidKeyMapper.charToHidKeyEvent(char) ?: continue
                     sendHidReportSync(keyEvent)
-                    Thread.sleep(KEY_SEQUENCE_DELAY_MS)
+                    if (seqDelay > 0) Thread.sleep(seqDelay)
                 }
             }
         }
+    }
+
+    /**
+     * Sends a Ctrl+V keystroke to the connected PC to trigger a paste.
+     * The caller must ensure the desired text is already in the PC's clipboard
+     * (e.g. via clipboard sync like Windows Phone Link / Cloud Clipboard).
+     */
+    fun sendPaste(): Boolean {
+        if (!isConnected) return false
+        val hid = hidDevice ?: return false
+        val device = connectedDevice ?: return false
+        keyExecutor.execute {
+            try {
+                hid.sendReport(device, 0, HidKeyMapper.createCtrlVReport())
+                Thread.sleep(KEY_PRESS_DELAY_MS)
+                hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
+            } catch (e: Exception) { log("E", "sendPaste error: ${e.message}") }
+        }
+        return true
     }
 
     fun sendEnter(): Boolean {

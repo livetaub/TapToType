@@ -26,7 +26,9 @@ Before committing, **always** auto-increment the version in `version.properties`
 3. Write the updated values back to `version.properties`.
 
 // turbo
-4. Use PowerShell to perform the bump. Example:
+4. **IMPORTANT: Do NOT run the bump as an inline one-liner.** Complex PowerShell with regex, `$` variables, and backticks hangs when passed inline. Instead, always use a script file:
+
+   First, create the bump script at `C:\tmp\bump_version.ps1` using the `write_to_file` tool with this content:
    ```powershell
    $props = Get-Content "version.properties" -Raw
    $code = [int]([regex]::Match($props, 'VERSION_CODE=(\d+)').Groups[1].Value)
@@ -40,7 +42,13 @@ Before committing, **always** auto-increment the version in `version.properties`
    Write-Host "Version bumped: $code -> $newCode, $name -> $newName"
    ```
 
-5. Include `version.properties` in the `git add` so the version bump is part of the commit.
+// turbo
+5. Then execute it:
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File C:\tmp\bump_version.ps1
+   ```
+
+6. Include `version.properties` in the `git add` so the version bump is part of the commit.
 
 ### How It Works
 
