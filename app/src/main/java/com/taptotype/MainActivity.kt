@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_DEFAULT_MODE = "default_mode"
         private const val PREF_COMPOSE_SEND_MODE = "compose_send_mode" // 0 = type, 1 = paste
         private const val PREF_KEYSTROKE_DELAY = "keystroke_delay_ms" // 0, 5, 10, ... 50
+        private const val PREF_PASTE_DELAY = "paste_delay_ms" // delay before Ctrl+V in paste mode
         private const val MAX_HISTORY = 5
     }
 
@@ -224,6 +225,8 @@ class MainActivity : AppCompatActivity() {
             .getInt(PREF_COMPOSE_SEND_MODE, 0)
         hidService.keystrokeDelayMs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .getLong(PREF_KEYSTROKE_DELAY, 0L)
+        hidService.pasteDelayMs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .getLong(PREF_PASTE_DELAY, 2000L)
 
         // Global crash handler — logs crash to in-app log for diagnostics
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -273,6 +276,7 @@ class MainActivity : AppCompatActivity() {
         hidService.useShiftEnter = prefs.getBoolean(PREF_SHIFT_ENTER, true)
         hidService.composeSendMode = prefs.getInt(PREF_COMPOSE_SEND_MODE, 0)
         hidService.keystrokeDelayMs = prefs.getLong(PREF_KEYSTROKE_DELAY, 0L)
+        hidService.pasteDelayMs = prefs.getLong(PREF_PASTE_DELAY, 2000L)
         // Note: We intentionally do NOT reset the mode spinner here.
         // The default mode from settings is only applied on fresh app launch (in setupUI).
         // Resetting it on every resume would override the user's current mode selection
@@ -360,10 +364,12 @@ class MainActivity : AppCompatActivity() {
             if (text.isNotEmpty()) {
                 if (hidService.isConnected) {
                     if (hidService.composeSendMode == 1) {
-                        // Paste mode: copy to Android clipboard, then send Ctrl+V
+                        // Paste mode: copy to Android clipboard, then send Ctrl+V after delay
                         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText("TapToType", text))
                         hidService.sendPaste()
+                        val delaySec = hidService.pasteDelayMs / 1000.0
+                        Toast.makeText(this, "Copied \u2014 pasting in ${delaySec}s...", Toast.LENGTH_SHORT).show()
                     } else {
                         // Type mode: send keystroke by keystroke
                         hidService.sendString(text)
@@ -373,7 +379,9 @@ class MainActivity : AppCompatActivity() {
                     inputField.text?.clear()
                     previousText = ""
                     ignoreTextChanges = false
-                    Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
+                    if (hidService.composeSendMode != 1) {
+                        Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
+                    }
                 } else {
                     Toast.makeText(this, "Not connected to any device", Toast.LENGTH_SHORT).show()
                 }

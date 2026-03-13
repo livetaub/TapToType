@@ -57,6 +57,9 @@ class BluetoothHidService private constructor(private val context: Context) {
     /** Extra delay (ms) between keystrokes in compose Type mode. 0 = fastest, increase if characters are dropped. */
     var keystrokeDelayMs: Long = 0L
 
+    /** Delay (ms) before sending Ctrl+V in paste mode, giving clipboard sync (e.g. Phone Link) time to propagate. */
+    var pasteDelayMs: Long = 2000L
+
     private val mainHandler = Handler(Looper.getMainLooper())
     private val keyExecutor = Executors.newSingleThreadExecutor()
     private val hidCallbackExecutor = Executors.newSingleThreadExecutor()
@@ -853,18 +856,25 @@ class BluetoothHidService private constructor(private val context: Context) {
 
     /**
      * Sends a Ctrl+V keystroke to the connected PC to trigger a paste.
-     * The caller must ensure the desired text is already in the PC's clipboard
-     * (e.g. via clipboard sync like Windows Phone Link / Cloud Clipboard).
+     * Waits [pasteDelayMs] before sending to give clipboard sync (e.g. Phone Link)
+     * time to propagate the text from Android to Windows clipboard.
      */
     fun sendPaste(): Boolean {
         if (!isConnected) return false
         val hid = hidDevice ?: return false
         val device = connectedDevice ?: return false
+        val delay = pasteDelayMs // snapshot
         keyExecutor.execute {
             try {
+                // Wait for clipboard sync to propagate
+                if (delay > 0) {
+                    log("D", "Paste mode: waiting ${delay}ms for clipboard sync...")
+                    Thread.sleep(delay)
+                }
                 hid.sendReport(device, 0, HidKeyMapper.createCtrlVReport())
                 Thread.sleep(KEY_PRESS_DELAY_MS)
                 hid.sendReport(device, 0, HidKeyMapper.createKeyUpReport())
+                log("D", "Paste mode: Ctrl+V sent")
             } catch (e: Exception) { log("E", "sendPaste error: ${e.message}") }
         }
         return true
