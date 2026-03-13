@@ -49,7 +49,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var hidService: BluetoothHidService
 
-    // UI elements — top bar
+    // UI elements â€” top bar
     private lateinit var appTitleRow: LinearLayout
     private lateinit var connectedBar: LinearLayout
     private lateinit var statusIndicator: View
@@ -57,13 +57,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var settingsButton: ImageButton
     private lateinit var connectedMenuButton: ImageButton
 
-    // UI elements — disconnected state
+    // UI elements â€” disconnected state
     private lateinit var disconnectedSection: LinearLayout
     private lateinit var savedDevicesContainer: LinearLayout
     private lateinit var addNewDeviceButton: Button
     private lateinit var deviceListLabel: TextView
 
-    // UI elements — connected / typing state
+    // UI elements â€” connected / typing state
     private lateinit var typingSection: LinearLayout
     private lateinit var inputField: HidEditText
     private lateinit var segmentLive: TextView
@@ -99,8 +99,11 @@ class MainActivity : AppCompatActivity() {
     private var wizardStatusLabel: TextView? = null
     private var wizardNextButton: Button? = null
     private var wizardActionButton: Button? = null
+    private var wizardStepCounter: TextView? = null
     private var wizardCurrentStep: Int = 0
     private var wizardSteps: List<WizardStep>? = null
+    private var wizardUpdateUI: (() -> Unit)? = null  // for auto-advance
+    private var discoverableUntil: Long = 0L  // timestamp for discoverable tracking
 
     // Saved device model
     data class SavedDevice(val name: String, val macAddress: String, val btName: String)
@@ -170,7 +173,8 @@ class MainActivity : AppCompatActivity() {
         if (result.resultCode == RESULT_CANCELED) {
             Toast.makeText(this, "Discoverable mode denied", Toast.LENGTH_SHORT).show()
         } else {
-            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds ✅", Toast.LENGTH_SHORT).show()
+            discoverableUntil = System.currentTimeMillis() + (DISCOVERABLE_DURATION * 1000L)
+            Toast.makeText(this, "Discoverable for $DISCOVERABLE_DURATION seconds âœ…", Toast.LENGTH_SHORT).show()
             refreshWizardStatus()
         }
     }
@@ -231,14 +235,14 @@ class MainActivity : AppCompatActivity() {
         hidService.keystrokeDelayMs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
             .getLong(PREF_KEYSTROKE_DELAY, 0L)
 
-        // Global crash handler — logs crash to in-app log for diagnostics
+        // Global crash handler â€” logs crash to in-app log for diagnostics
         val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             try {
                 val stackTrace = throwable.stackTraceToString()
                     .take(2000) // cap length
                 hidService.log("CRASH", "Uncaught exception in ${thread.name}:\n$stackTrace")
-            } catch (_: Exception) { /* last resort — don't crash the crash handler */ }
+            } catch (_: Exception) { /* last resort â€” don't crash the crash handler */ }
             defaultHandler?.uncaughtException(thread, throwable)
         }
 
@@ -249,7 +253,7 @@ class MainActivity : AppCompatActivity() {
         // The inputField steals focus on launch; suppress the keyboard until typing page is shown
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN)
 
-        // Keyboard visibility listener — show/hide the live mode hint button
+        // Keyboard visibility listener â€” show/hide the live mode hint button
         val rootView = findViewById<View>(android.R.id.content)
         rootView.viewTreeObserver.addOnGlobalLayoutListener {
             val rect = android.graphics.Rect()
@@ -389,7 +393,7 @@ class MainActivity : AppCompatActivity() {
                             sendButton.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
                         }.start()
                     it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                    Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Sent âœ…", Toast.LENGTH_SHORT).show()
                     updateButtonStates()
                     updateCharCounter()
                 } else {
@@ -456,21 +460,21 @@ class MainActivity : AppCompatActivity() {
                         val deletedCount = previousText.length - currentText.length
                         repeat(deletedCount) {
                             hidService.sendBackspace()
-                            addEchoChar('⌫')
+                            addEchoChar('âŒ«')
                         }
                     } else if (currentText.length > previousText.length) {
                         val newChars = currentText.substring(previousText.length)
                         for (char in newChars) {
                             if (char == '\n') {
                                 hidService.sendEnter()
-                                addEchoChar('↵')
+                                addEchoChar('â†µ')
                             } else {
                                 hidService.sendKeyPress(char)
                                 addEchoChar(char)
                             }
                         }
                     }
-                    // Clear the field — live mode doesn't accumulate text
+                    // Clear the field â€” live mode doesn't accumulate text
                     ignoreTextChanges = true
                     inputField.text?.clear()
                     previousText = "" // field is now empty, must match
@@ -483,11 +487,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         })
-        // Backspace on empty field — only send to PC in live mode
+        // Backspace on empty field â€” only send to PC in live mode
         inputField.onEmptyBackspace = {
             if (isLiveMode && hidService.isConnected) {
                 hidService.sendBackspace()
-                addEchoChar('⌫')
+                addEchoChar('âŒ«')
             }
         }
 
@@ -596,7 +600,7 @@ class MainActivity : AppCompatActivity() {
                     v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
                 }
             }
-            false // don't consume — let onClick fire
+            false // don't consume â€” let onClick fire
         }
     }
 
@@ -685,13 +689,13 @@ class MainActivity : AppCompatActivity() {
 
     private fun showComposeHistory() {
         if (composeHistory.isEmpty()) {
-            Toast.makeText(this, "No history yet — sent messages will appear here", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "No history yet â€” sent messages will appear here", Toast.LENGTH_SHORT).show()
             return
         }
 
         // Truncate display labels for the dialog (show first 80 chars)
         val displayItems = composeHistory.map { msg ->
-            if (msg.length > 80) msg.take(80) + "…" else msg
+            if (msg.length > 80) msg.take(80) + "â€¦" else msg
         }.toTypedArray()
 
         AlertDialog.Builder(this, R.style.DialogTheme)
@@ -783,9 +787,9 @@ class MainActivity : AppCompatActivity() {
     private fun showConnectedMenu() {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setItems(arrayOf(
-                "⚡  Disconnect",
-                "⚙️  Settings",
-                "📋  Diagnostics"
+                "âš¡  Disconnect",
+                "âš™ï¸  Settings",
+                "ðŸ“‹  Diagnostics"
             )) { _, which ->
                 when (which) {
                     0 -> confirmDisconnect()
@@ -807,16 +811,16 @@ class MainActivity : AppCompatActivity() {
         val enterLabel = if (hidService.useShiftEnter) "Shift+Enter (line break)" else "Enter (submit)"
 
         val items = mutableListOf<String>()
-        items.add("🎨  Theme: ${when(currentTheme) { 0 -> "Light ☀️"; 1 -> "Dark 🌙"; else -> "System 🔄" }}")
-        items.add("↵  Enter key: $enterLabel")
-        if (hidService.isConnected) items.add("⚡  Disconnect from PC")
-        if (!hidService.isRegistered) items.add("🔁  Retry HID Registration")
-        items.add("🔄  Re-initialize Bluetooth")
-        items.add("🔍  Show Diagnostics")
-        items.add("📋  View Logs")
+        items.add("ðŸŽ¨  Theme: ${when(currentTheme) { 0 -> "Light â˜€ï¸"; 1 -> "Dark ðŸŒ™"; else -> "System ðŸ”„" }}")
+        items.add("â†µ  Enter key: $enterLabel")
+        if (hidService.isConnected) items.add("âš¡  Disconnect from PC")
+        if (!hidService.isRegistered) items.add("ðŸ”  Retry HID Registration")
+        items.add("ðŸ”„  Re-initialize Bluetooth")
+        items.add("ðŸ”  Show Diagnostics")
+        items.add("ðŸ“‹  View Logs")
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("⚙️  Settings")
+            .setTitle("âš™ï¸  Settings")
             .setItems(items.toTypedArray()) { _, which ->
                 var idx = 1
                 when (which) {
@@ -849,7 +853,7 @@ class MainActivity : AppCompatActivity() {
         val currentTheme = prefs.getInt(PREF_THEME_MODE, 0)
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Choose Theme")
-            .setSingleChoiceItems(arrayOf("☀️  Light", "🌙  Dark", "🔄  Follow System"), currentTheme) { dialog, which ->
+            .setSingleChoiceItems(arrayOf("â˜€ï¸  Light", "ðŸŒ™  Dark", "ðŸ”„  Follow System"), currentTheme) { dialog, which ->
                 setThemeMode(which)
                 dialog.dismiss()
             }
@@ -863,8 +867,8 @@ class MainActivity : AppCompatActivity() {
             .setTitle("Enter Key Behavior")
             .setSingleChoiceItems(
                 arrayOf(
-                    "↵  Enter (submit / confirm)",
-                    "⇧↵  Shift+Enter (line break)"
+                    "â†µ  Enter (submit / confirm)",
+                    "â‡§â†µ  Shift+Enter (line break)"
                 ),
                 currentChoice
             ) { dialog, which ->
@@ -874,7 +878,7 @@ class MainActivity : AppCompatActivity() {
                     .edit().putBoolean(PREF_SHIFT_ENTER, useShift).apply()
                 Toast.makeText(
                     this,
-                    if (useShift) "Enter → Shift+Enter (line break)" else "Enter → Enter (submit)",
+                    if (useShift) "Enter â†’ Shift+Enter (line break)" else "Enter â†’ Enter (submit)",
                     Toast.LENGTH_SHORT
                 ).show()
                 dialog.dismiss()
@@ -921,7 +925,7 @@ class MainActivity : AppCompatActivity() {
         }
         scrollView.addView(tv)
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("🔍  Diagnostics")
+            .setTitle("ðŸ”  Diagnostics")
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy") { _, _ ->
@@ -950,7 +954,7 @@ class MainActivity : AppCompatActivity() {
         scrollView.post { scrollView.fullScroll(ScrollView.FOCUS_DOWN) }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("📋  Connection Logs")
+            .setTitle("ðŸ“‹  Connection Logs")
             .setView(scrollView)
             .setPositiveButton("OK", null)
             .setNeutralButton("Copy All") { _, _ ->
@@ -984,12 +988,19 @@ class MainActivity : AppCompatActivity() {
         val backButton = view.findViewById<Button>(R.id.wizardBackButton)
         val nextButton = view.findViewById<Button>(R.id.wizardNextButton)
         val dismissButton = view.findViewById<TextView>(R.id.wizardDismissButton)
+        val helpButton = view.findViewById<TextView>(R.id.wizardHelpButton)
+        val stepCounter = view.findViewById<TextView>(R.id.wizardStepCounter)
+        val deviceListScroll = view.findViewById<ScrollView>(R.id.wizardDeviceListScroll)
+        val deviceListContainer = view.findViewById<LinearLayout>(R.id.wizardDeviceList)
+        val successOverlay = view.findViewById<LinearLayout>(R.id.wizardSuccessOverlay)
+        val successDevice = view.findViewById<TextView>(R.id.wizardSuccessDevice)
 
         // Save refs for external refresh
         wizardStatusDot = statusDot
         wizardStatusLabel = statusLabel
         wizardNextButton = nextButton
         wizardActionButton = actionButton
+        wizardStepCounter = stepCounter
 
         val dots = arrayOf(
             view.findViewById<View>(R.id.wizardDot1),
@@ -999,16 +1010,16 @@ class MainActivity : AppCompatActivity() {
             view.findViewById<View>(R.id.wizardDot5)
         )
 
-        wizardCurrentStep = 0
+        val deviceName = Build.MODEL  // e.g. "Pixel 8a", "Galaxy S24"
 
         val steps = listOf(
             WizardStep(
-                title = "Enable Bluetooth",
-                description = "Make sure Bluetooth is turned on in your phone's Settings.",
+                title = "📶  Enable Bluetooth",
+                description = "Make sure Bluetooth is turned on in your phone\u2019s Settings.",
                 hint = "The app needs Bluetooth to communicate with your PC.",
                 canAutoDetect = true,
                 detectCheck = { hidService.bluetoothAdapter?.isEnabled == true },
-                detectLabel = { if (it) "✅ Bluetooth is ON" else "❌ Bluetooth is OFF" },
+                detectLabel = { if (it) "\u2705 Bluetooth is ON" else "\u274c Bluetooth is OFF" },
                 actionLabel = "Turn On Bluetooth",
                 actionCallback = {
                     val enableIntent = Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE)
@@ -1016,16 +1027,16 @@ class MainActivity : AppCompatActivity() {
                 }
             ),
             WizardStep(
-                title = "Grant Permissions",
+                title = "🔐  Grant Permissions",
                 description = "The app needs Bluetooth permissions to discover and connect to your PC.",
-                hint = "Tap the button below to grant permissions, or go to:\nSettings → Apps → TapToType → Permissions",
+                hint = "Tap the button below to grant permissions.",
                 canAutoDetect = true,
                 detectCheck = {
                     requiredPermissions.all {
                         ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
                     }
                 },
-                detectLabel = { if (it) "✅ All permissions granted" else "❌ Permissions needed" },
+                detectLabel = { if (it) "\u2705 All permissions granted" else "\u274c Permissions needed" },
                 actionLabel = "Grant Permissions",
                 actionCallback = {
                     val missing = requiredPermissions.filter {
@@ -1034,69 +1045,128 @@ class MainActivity : AppCompatActivity() {
                     if (missing.isNotEmpty()) {
                         permissionLauncher.launch(missing.toTypedArray())
                     } else {
-                        Toast.makeText(this, "All permissions already granted ✅", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "All permissions already granted \u2705", Toast.LENGTH_SHORT).show()
                         refreshWizardStatus()
                     }
                 }
             ),
             WizardStep(
-                title = "Make Phone Discoverable",
-                description = "Let your Windows PC find your phone via Bluetooth.",
-                hint = "This makes your phone visible for 2 minutes.\nDo this BEFORE searching on your PC.",
-                canAutoDetect = false,
-                detectCheck = { true },
-                detectLabel = { "" },
-                actionLabel = "📡  Make Discoverable",
+                title = "📡  Make Phone Discoverable",
+                description = "Your PC needs to find \"$deviceName\" via Bluetooth.\n\n" +
+                        "Tap the button below, then immediately go to your PC for the next step.",
+                hint = "Your phone will be visible for 2 minutes.",
+                canAutoDetect = true,
+                detectCheck = { System.currentTimeMillis() < discoverableUntil },
+                detectLabel = {
+                    if (it) {
+                        val remaining = ((discoverableUntil - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+                        "\u2705 Discoverable ($remaining sec remaining)"
+                    } else {
+                        "\u23f3 Not yet discoverable"
+                    }
+                },
+                actionLabel = "\uD83D\uDCE1  Make Discoverable",
                 actionCallback = {
                     requestDiscoverableMode()
                 }
             ),
             WizardStep(
-                title = "Pair from Windows PC",
-                description = "⚠️ IMPORTANT: The app must be open during pairing!\n\n" +
-                        "On your Windows PC:\n" +
-                        "1. Remove \"Pixel 10\" if already paired\n" +
-                        "2. Go to Settings → Bluetooth & Devices\n" +
-                        "3. Add device → Bluetooth\n" +
-                        "4. Select your phone and accept on BOTH devices",
-                hint = "If your phone shows under \"Other devices\" on the PC instead of " +
-                        "\"Mouse, keyboard, & pen\", you need to REMOVE it and re-pair " +
-                        "while this app is open.\n\n" +
-                        "The phone must advertise as a keyboard during pairing!",
+                title = "🔗  Pair from your PC",
+                description = "On your Windows PC:\n\n" +
+                        "1\ufe0f\u20e3  Open Settings \u2192 Bluetooth & Devices\n\n" +
+                        "2\ufe0f\u20e3  Click \"Add device\" \u2192 Bluetooth\n\n" +
+                        "3\ufe0f\u20e3  Select \"$deviceName\" from the list\n\n" +
+                        "4\ufe0f\u20e3  Accept the pairing on BOTH devices",
+                hint = "\u26a0\ufe0f This app must be open during pairing!\n" +
+                        "If it doesn\u2019t work, remove \"$deviceName\" from\nyour PC\u2019s Bluetooth and try again.",
                 canAutoDetect = true,
                 detectCheck = { hidService.getPairedDevices().isNotEmpty() },
-                detectLabel = { if (it) "✅ Paired device(s) found" else "⏳ Waiting — pair from your PC" },
-                actionLabel = "Open Bluetooth Settings (to unpair)",
+                detectLabel = { if (it) "\u2705 Paired device found" else "\u23f3 Waiting \u2014 pair from your PC\u2026" },
+                actionLabel = "Already paired? Fix pairing issues",
                 actionCallback = {
                     try {
                         val intent = Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)
                         startActivity(intent)
                     } catch (e: Exception) {
-                        Toast.makeText(this, "Open Settings → Bluetooth manually", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "Open Settings \u2192 Bluetooth manually", Toast.LENGTH_SHORT).show()
                     }
                 }
             ),
             WizardStep(
-                title = "Connect to your PC",
-                description = "Select your Windows PC from the list below to connect as a keyboard.",
+                title = "💻  Connect to your PC",
+                description = "Tap your PC from the list below to connect.",
                 hint = "Once connected, click any text field on your PC and start typing!",
                 canAutoDetect = true,
                 detectCheck = { hidService.isConnected },
-                detectLabel = { if (it) "✅ Connected!" else "⏳ Not connected yet" },
-                actionLabel = "🔗  Connect to Device",
-                actionCallback = {
-                    showDeviceSelectionDialog()
-                }
+                detectLabel = { if (it) "\u2705 Connected!" else "\u23f3 Not connected yet" },
+                actionLabel = null,
+                actionCallback = null
             )
         )
         wizardSteps = steps
 
+        // Smart skip: find the first incomplete step
+        wizardCurrentStep = 0
+        for (i in steps.indices) {
+            if (steps[i].canAutoDetect && steps[i].detectCheck()) {
+                wizardCurrentStep = i + 1
+            } else {
+                break
+            }
+        }
+        wizardCurrentStep = wizardCurrentStep.coerceAtMost(steps.size - 1)
+
+        @SuppressLint("MissingPermission")
         fun updateWizardUI() {
             val step = steps[wizardCurrentStep]
+            val isLastStep = wizardCurrentStep == steps.size - 1
+            val isConnected = isLastStep && hidService.isConnected
+
+            // Success state — show celebration overlay
+            if (isConnected) {
+                successOverlay.visibility = View.VISIBLE
+                stepBadge.visibility = View.GONE
+                stepTitle.visibility = View.GONE
+                stepDescription.visibility = View.GONE
+                stepHint.visibility = View.GONE
+                statusRow.visibility = View.GONE
+                actionButton.visibility = View.GONE
+                deviceListScroll.visibility = View.GONE
+                backButton.visibility = View.GONE
+                nextButton.text = "Done \u2705"
+                nextButton.isEnabled = true
+                nextButton.alpha = 1f
+
+                val device = hidService.getConnectedDevice()
+                val mac = device?.address ?: ""
+                val saved = getSavedDevices().find { it.macAddress == mac }
+                successDevice.text = "Connected to ${saved?.name ?: device?.name ?: "your PC"}"
+
+                // Update dots — all complete
+                for (i in dots.indices) {
+                    dots[i].setBackgroundResource(R.drawable.wizard_dot_complete)
+                }
+                stepCounter.text = "Complete!"
+
+                // Auto-dismiss after 2.5 seconds
+                Handler(Looper.getMainLooper()).postDelayed({
+                    wizardDialog?.dismiss()
+                }, 2500L)
+                return
+            }
+
+            // Normal state — hide success overlay
+            successOverlay.visibility = View.GONE
+            stepBadge.visibility = View.VISIBLE
+            stepTitle.visibility = View.VISIBLE
+            stepDescription.visibility = View.VISIBLE
+            stepHint.visibility = View.VISIBLE
+
             stepBadge.text = "${wizardCurrentStep + 1}"
             stepTitle.text = step.title
             stepDescription.text = step.description
             stepHint.text = step.hint
+            stepCounter.text = "Step ${wizardCurrentStep + 1} of ${steps.size}"
 
             for (i in dots.indices) {
                 when {
@@ -1106,7 +1176,6 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Status detection row
             if (step.canAutoDetect) {
                 statusRow.visibility = View.VISIBLE
                 val detected = step.detectCheck()
@@ -1122,12 +1191,9 @@ class MainActivity : AppCompatActivity() {
                 nextButton.alpha = 1.0f
             }
 
-            // Action button
             if (step.actionLabel != null && step.actionCallback != null) {
                 actionButton.visibility = View.VISIBLE
                 actionButton.text = step.actionLabel
-
-                // Hide action button if step is already complete
                 if (step.canAutoDetect && step.detectCheck()) {
                     actionButton.visibility = View.GONE
                 }
@@ -1135,11 +1201,58 @@ class MainActivity : AppCompatActivity() {
                 actionButton.visibility = View.GONE
             }
 
+            // Step 5: Show inline device list
+            if (isLastStep) {
+                val pairedDevices = hidService.getPairedDevices()
+                deviceListContainer.removeAllViews()
+                if (pairedDevices.isNotEmpty()) {
+                    deviceListScroll.visibility = View.VISIBLE
+                    actionButton.visibility = View.GONE  // use inline buttons instead
+
+                    for (device in pairedDevices) {
+                        val btn = Button(this@MainActivity).apply {
+                            text = "\uD83D\uDCBB  ${device.name ?: device.address}"
+                            setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_primary))
+                            textSize = 15f
+                            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                            setBackgroundResource(R.drawable.card_background)
+                            val pad = (16 * resources.displayMetrics.density).toInt()
+                            setPadding(pad, pad, pad, pad)
+                            val lp = LinearLayout.LayoutParams(
+                                LinearLayout.LayoutParams.MATCH_PARENT,
+                                LinearLayout.LayoutParams.WRAP_CONTENT
+                            )
+                            lp.bottomMargin = (8 * resources.displayMetrics.density).toInt()
+                            layoutParams = lp
+
+                            setOnClickListener {
+                                if (!hidService.isRegistered) {
+                                    hidService.initialize()
+                                }
+                                val result = hidService.connectToDevice(device)
+                                if (!result.accepted) {
+                                    Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(this@MainActivity, "Connecting\u2026", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
+                        addPressAnimation(btn)
+                        deviceListContainer.addView(btn)
+                    }
+                } else {
+                    deviceListScroll.visibility = View.GONE
+                }
+            } else {
+                deviceListScroll.visibility = View.GONE
+            }
+
             backButton.visibility = if (wizardCurrentStep > 0) View.VISIBLE else View.GONE
-            nextButton.text = if (wizardCurrentStep == steps.size - 1) "Done ✅" else "Next →"
+            nextButton.text = if (isLastStep) "Done \u2705" else "Next \u2192"
         }
 
-        // Action button click — delegates to the current step's callback
+        wizardUpdateUI = { updateWizardUI() }
+
         actionButton.setOnClickListener {
             steps[wizardCurrentStep].actionCallback?.invoke()
         }
@@ -1164,16 +1277,21 @@ class MainActivity : AppCompatActivity() {
             wizardDialog?.dismiss()
         }
 
+        helpButton.setOnClickListener {
+            showWizardHelp()
+        }
+
         wizardDialog = AlertDialog.Builder(this, R.style.SetupWizardDialog)
             .setView(view)
             .setCancelable(true)
             .setOnDismissListener {
-                // Clear refs when dismissed
                 wizardStatusDot = null
                 wizardStatusLabel = null
                 wizardNextButton = null
                 wizardActionButton = null
+                wizardStepCounter = null
                 wizardSteps = null
+                wizardUpdateUI = null
             }
             .create()
 
@@ -1204,7 +1322,51 @@ class MainActivity : AppCompatActivity() {
             if (detected && step.actionLabel != null) {
                 wizardActionButton?.visibility = View.GONE
             }
+
+            // Auto-advance: when step completes, move to next after a short delay
+            if (detected && wizardCurrentStep < steps.size - 1) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (wizardSteps != null && wizardCurrentStep < steps.size - 1) {
+                        val currentStep = steps[wizardCurrentStep]
+                        if (currentStep.canAutoDetect && currentStep.detectCheck()) {
+                            wizardCurrentStep++
+                            wizardUpdateUI?.invoke()
+                        }
+                    }
+                }, 800L)
+            }
         }
+    }
+
+    /** Show troubleshooting help dialog with common issues and fixes. */
+    private fun showWizardHelp() {
+        val deviceName = Build.MODEL
+        val helpText = "Having trouble connecting? Here are solutions for common issues:\n\n" +
+            "\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n" +
+            "\uD83D\uDD39 PC can\u2019t find my phone\n" +
+            "\u2022 Make sure you tapped \"Make Discoverable\" in Step 3\n" +
+            "\u2022 Discoverability only lasts 2 minutes \u2014 redo it if needed\n" +
+            "\u2022 Make sure Bluetooth is ON on your PC too\n\n" +
+            "\uD83D\uDD39 Phone pairs but doesn\u2019t work as keyboard\n" +
+            "\u2022 This app MUST be open during pairing\n" +
+            "\u2022 Remove \"$deviceName\" from your PC\u2019s Bluetooth, then pair again while this app is open\n" +
+            "\u2022 On your PC, \"$deviceName\" should appear under \"Mouse, keyboard, & pen\" \u2014 NOT under \"Other devices\"\n\n" +
+            "\uD83D\uDD39 Was working before, now it won\u2019t connect\n" +
+            "\u2022 Unpair your phone from your PC\n" +
+            "\u2022 Close and reopen this app\n" +
+            "\u2022 Follow the setup wizard from Step 3\n\n" +
+            "\uD83D\uDD39 Typing is slow or drops characters\n" +
+            "\u2022 Go to Settings \u2192 Keystroke delay\n" +
+            "\u2022 Try increasing the delay to 10ms or 20ms\n\n" +
+            "\uD83D\uDD39 Multiple PCs\n" +
+            "\u2022 You can pair with multiple PCs\n" +
+            "\u2022 But you can only be connected to ONE at a time"
+
+        AlertDialog.Builder(this, R.style.DialogTheme)
+            .setTitle("\uD83D\uDCA1 Troubleshooting")
+            .setMessage(helpText)
+            .setPositiveButton("Got it", null)
+            .show()
     }
 
     // ============================================================
@@ -1248,7 +1410,7 @@ class MainActivity : AppCompatActivity() {
                 "HID Initialization Failed",
                 "Could not initialize Bluetooth HID.\n\n" +
                         "Your device may not support the Bluetooth HID Device profile.\n\n" +
-                        "Try: Settings ⚙️ → Re-initialize Bluetooth HID"
+                        "Try: Settings âš™ï¸ â†’ Re-initialize Bluetooth HID"
             )
         }
 
@@ -1276,7 +1438,7 @@ class MainActivity : AppCompatActivity() {
         val deviceNames = pairedDevices.map { device ->
             val typeStr = when (device.type) {
                 BluetoothDevice.DEVICE_TYPE_CLASSIC -> "Classic BT"
-                BluetoothDevice.DEVICE_TYPE_LE -> "⚠️ BLE only"
+                BluetoothDevice.DEVICE_TYPE_LE -> "âš ï¸ BLE only"
                 BluetoothDevice.DEVICE_TYPE_DUAL -> "Classic + BLE"
                 else -> "Unknown"
             }
@@ -1373,7 +1535,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("✅ Connected! Save this device?")
+            .setTitle("âœ… Connected! Save this device?")
             .setMessage("Give this PC a name for quick reconnecting:")
             .setView(input)
             .setPositiveButton("Save") { _, _ ->
@@ -1381,7 +1543,7 @@ class MainActivity : AppCompatActivity() {
                 val devices = getSavedDevices()
                 devices.add(SavedDevice(customName, mac, btName))
                 saveSavedDevices(devices)
-                Toast.makeText(this, "Saved \"$customName\" ✅", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Saved \"$customName\" âœ…", Toast.LENGTH_SHORT).show()
                 refreshSavedDevicesUI()
                 // Update the connected status text to show the saved name
                 statusText.text = "Connected to: $customName"
@@ -1508,7 +1670,7 @@ class MainActivity : AppCompatActivity() {
         val btDevice = hidService.getPairedDevices().find { it.address == device.macAddress }
         if (btDevice == null) {
             AlertDialog.Builder(this, R.style.DialogTheme)
-                .setTitle("⚠️ Device Not Found")
+                .setTitle("âš ï¸ Device Not Found")
                 .setMessage("\"${device.name}\" (${device.macAddress}) is not currently paired.\n\n" +
                         "You may need to re-pair it from your PC's Bluetooth settings.")
                 .setPositiveButton("Open Setup Wizard") { _, _ -> showSetupWizard() }
@@ -1546,7 +1708,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSavedDeviceOptions(device: SavedDevice) {
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle(device.name)
-            .setItems(arrayOf("✏️ Rename", "🗑️ Remove")) { _, which ->
+            .setItems(arrayOf("âœï¸ Rename", "ðŸ—‘ï¸ Remove")) { _, which ->
                 when (which) {
                     0 -> renameSavedDevice(device)
                     1 -> removeSavedDevice(device)
@@ -1609,7 +1771,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showErrorDialog(title: String, message: String) {
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("⚠️  $title")
+            .setTitle("âš ï¸  $title")
             .setMessage(message)
             .setPositiveButton("OK", null)
             .setNeutralButton("Diagnostics") { _, _ -> showDiagnostics() }

@@ -4,10 +4,11 @@ description: Git commit and push workflow
 
 ## Rules
 
-1. **Never commit or push to git automatically.** Only after the user explicitly confirms the changes are accepted and ready to push.
-2. When changes are ready for review, summarize what was changed and ask the user if they want to push.
-3. Use separate `git add` and `git commit` commands (PowerShell doesn't support `&&`).
-4. Keep commit messages concise and descriptive.
+1. **NEVER commit or push to git unless the user explicitly requests it** (e.g. by invoking `/git-push` or saying "push" / "commit"). Do NOT auto-commit after code changes — the user will decide when they are done.
+2. **Batch changes.** Do NOT push after every small edit. The user typically pushes once at the end of a work session, not after every file change.
+3. When the user requests a push, summarize what was changed and ask for confirmation before executing.
+4. Use separate `git add` and `git commit` commands (PowerShell doesn't support `&&`).
+5. Keep commit messages concise and descriptive.
 
 ## Version Bump (Before Every Push)
 

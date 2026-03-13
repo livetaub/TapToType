@@ -28,7 +28,19 @@
         android:textColor="@color/text_secondary"
         android:gravity="center"
         android:lineSpacingExtra="2dp"
-        android:layout_marginBottom="28dp" />
+        android:layout_marginBottom="4dp" />
+
+    <!-- Step counter -->
+    <TextView
+        android:id="@+id/wizardStepCounter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Step 1 of 5"
+        android:textSize="13sp"
+        android:textColor="@color/accent"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:layout_marginBottom="24dp" />
 
     <!-- Step Progress Indicators -->
     <LinearLayout
@@ -189,7 +201,71 @@
         android:textColor="@color/button_secondary_text"
         android:textSize="15sp"
         android:visibility="gone"
-        android:layout_marginBottom="20dp" />
+        android:layout_marginBottom="12dp" />
+
+    <!-- Inline device list (Step 5 only) -->
+    <ScrollView
+        android:id="@+id/wizardDeviceListScroll"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="180dp"
+        android:visibility="gone"
+        android:layout_marginBottom="16dp">
+
+        <LinearLayout
+            android:id="@+id/wizardDeviceList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+
+    <!-- Success overlay (shown when connected) -->
+    <LinearLayout
+        android:id="@+id/wizardSuccessOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        android:paddingTop="16dp"
+        android:paddingBottom="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✅"
+            android:textSize="48sp"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="You're connected!"
+            android:textSize="20sp"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:fontFamily="sans-serif-medium"
+            android:gravity="center"
+            android:layout_marginBottom="8dp" />
+
+        <TextView
+            android:id="@+id/wizardSuccessDevice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Connected to your PC"
+            android:textSize="15sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Click any text field on your PC and start typing!"
+            android:textSize="14sp"
+            android:textColor="@color/text_tertiary"
+            android:gravity="center" />
+    </LinearLayout>
 
     <!-- Navigation Buttons -->
     <LinearLayout
@@ -232,6 +308,19 @@
         android:fontFamily="sans-serif-medium"
         android:gravity="center"
         android:paddingTop="20dp"
+        android:paddingBottom="4dp" />
+
+    <!-- Help link -->
+    <TextView
+        android:id="@+id/wizardHelpButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Need help?"
+        android:textSize="14sp"
+        android:textColor="@color/text_accent"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:paddingTop="12dp"
         android:paddingBottom="4dp" />
 
 </LinearLayout>
