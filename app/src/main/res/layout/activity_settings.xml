@@ -114,9 +114,13 @@
                         android:fontFamily="sans-serif"
                         android:paddingTop="2dp" />
                 </LinearLayout>
-            </LinearLayout>
 
-            <!-- Default Mode -->
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_chevron_right"
+                    android:layout_marginStart="8dp" />
+            </LinearLayout>
             <LinearLayout
                 android:id="@+id/settingMode"
                 android:layout_width="match_parent"
@@ -163,6 +167,12 @@
                         android:fontFamily="sans-serif"
                         android:paddingTop="2dp" />
                 </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_chevron_right"
+                    android:layout_marginStart="8dp" />
             </LinearLayout>
 
             <!-- Enter Key Behavior -->
@@ -212,6 +222,12 @@
                         android:fontFamily="sans-serif"
                         android:paddingTop="2dp" />
                 </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_chevron_right"
+                    android:layout_marginStart="8dp" />
             </LinearLayout>
 
             <!-- Keystroke delay -->
@@ -261,6 +277,12 @@
                         android:fontFamily="sans-serif"
                         android:paddingTop="2dp" />
                 </LinearLayout>
+
+                <ImageView
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:src="@drawable/ic_chevron_right"
+                    android:layout_marginStart="8dp" />
             </LinearLayout>
 
             <!-- Divider -->

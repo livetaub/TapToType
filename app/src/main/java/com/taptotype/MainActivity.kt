@@ -1,6 +1,8 @@
 package com.taptotype
 
 import android.Manifest
+import android.animation.ObjectAnimator
+import android.animation.PropertyValuesHolder
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
@@ -16,11 +18,13 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.*
-import android.widget.ArrayAdapter
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.activity.result.contract.ActivityResultContracts
@@ -62,12 +66,16 @@ class MainActivity : AppCompatActivity() {
     // UI elements — connected / typing state
     private lateinit var typingSection: LinearLayout
     private lateinit var inputField: HidEditText
-    private lateinit var modeSpinner: Spinner
+    private lateinit var segmentLive: TextView
+    private lateinit var segmentCompose: TextView
+    private lateinit var segmentIndicator: View
     private lateinit var modeHelperText: TextView
     private lateinit var sendButton: ImageButton
     private lateinit var clearButton: Button
     private lateinit var historyButton: ImageButton
     private lateinit var actionButtons: LinearLayout
+    private lateinit var charCounter: TextView
+    private var pulseAnimator: ObjectAnimator? = null
 
     // Compose mode history (in-memory only)
     private val composeHistory = mutableListOf<String>()
@@ -193,12 +201,15 @@ class MainActivity : AppCompatActivity() {
         // Connected / typing state
         typingSection = findViewById(R.id.typingSection)
         inputField = findViewById(R.id.inputField)
-        modeSpinner = findViewById(R.id.modeSpinner)
+        segmentLive = findViewById(R.id.segmentLive)
+        segmentCompose = findViewById(R.id.segmentCompose)
+        segmentIndicator = findViewById(R.id.segmentIndicator)
         modeHelperText = findViewById(R.id.modeHelperText)
         sendButton = findViewById(R.id.sendButton)
         clearButton = findViewById(R.id.clearButton)
         historyButton = findViewById(R.id.historyButton)
         actionButtons = findViewById(R.id.actionButtons)
+        charCounter = findViewById(R.id.charCounter)
         liveEchoScroll = findViewById(R.id.liveEchoScroll)
         liveEchoText = findViewById(R.id.liveEchoText)
         liveEchoHint = findViewById(R.id.liveEchoHint)
@@ -333,21 +344,34 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Mode spinner setup
-        val modeOptions = arrayOf("⌨️  Live", "✏️  Compose")
-        val spinnerAdapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, modeOptions)
-        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        modeSpinner.adapter = spinnerAdapter
-        // Restore saved mode
+        // Segmented control setup
         val savedMode = getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getInt(PREF_DEFAULT_MODE, 0)
-        modeSpinner.setSelection(savedMode)
-        modeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
-                isLiveMode = (position == 0)
-                updateModeUI(isLiveMode)
+        isLiveMode = (savedMode == 0)
+        // Measure and set indicator after layout
+        segmentLive.post { updateSegmentIndicator(isLiveMode, animate = false) }
+
+        segmentLive.setOnClickListener {
+            if (!isLiveMode) {
+                isLiveMode = true
+                updateSegmentIndicator(true, animate = true)
+                updateModeUI(true)
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             }
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) {}
         }
+        segmentCompose.setOnClickListener {
+            if (isLiveMode) {
+                isLiveMode = false
+                updateSegmentIndicator(false, animate = true)
+                updateModeUI(false)
+                it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+        }
+
+        // Button press scale animations
+        addPressAnimation(sendButton)
+        addPressAnimation(clearButton)
+        addPressAnimation(historyButton)
+        addPressAnimation(addNewDeviceButton)
 
         sendButton.setOnClickListener {
             val text = inputField.text.toString()
@@ -359,7 +383,15 @@ class MainActivity : AppCompatActivity() {
                     inputField.text?.clear()
                     previousText = ""
                     ignoreTextChanges = false
+                    // Send success pulse animation
+                    sendButton.animate().scaleX(1.15f).scaleY(1.15f).setDuration(120)
+                        .withEndAction {
+                            sendButton.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                        }.start()
+                    it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
                     Toast.makeText(this, "Sent ✅", Toast.LENGTH_SHORT).show()
+                    updateButtonStates()
+                    updateCharCounter()
                 } else {
                     Toast.makeText(this, "Not connected to any device", Toast.LENGTH_SHORT).show()
                 }
@@ -371,6 +403,9 @@ class MainActivity : AppCompatActivity() {
             inputField.text?.clear()
             previousText = ""
             ignoreTextChanges = false
+            updateButtonStates()
+            updateCharCounter()
+            it.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
         }
 
         historyButton.setOnClickListener {
@@ -443,6 +478,8 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     // Type & Send mode: text stays local until Send is tapped
                     previousText = currentText
+                    updateButtonStates()
+                    updateCharCounter()
                 }
             }
         })
@@ -469,6 +506,7 @@ class MainActivity : AppCompatActivity() {
             sendButton.visibility = View.GONE
             clearButton.visibility = View.GONE
             historyButton.visibility = View.GONE
+            charCounter.visibility = View.GONE
             inputField.alpha = 0f
             inputField.lockCursorToEnd = true
             liveEchoScroll.visibility = View.VISIBLE
@@ -488,13 +526,101 @@ class MainActivity : AppCompatActivity() {
             sendButton.visibility = View.VISIBLE
             clearButton.visibility = View.VISIBLE
             historyButton.visibility = View.VISIBLE
+            charCounter.visibility = View.VISIBLE
             inputField.alpha = 1f
-            inputField.hint = "Type your message, then tap Send…"
+            inputField.hint = "Type your message, then tap Send\u2026"
             inputField.lockCursorToEnd = false
             liveEchoScroll.visibility = View.GONE
             modeHelperText.text = "Write your message first, then send it all at once"
             liveEchoHint.visibility = View.GONE
+            updateButtonStates()
+            updateCharCounter()
         }
+    }
+
+    /** Update send/clear button enabled state based on input content. */
+    private fun updateButtonStates() {
+        if (isLiveMode) return
+        val hasText = inputField.text?.isNotEmpty() == true
+        sendButton.isEnabled = hasText
+        sendButton.alpha = if (hasText) 1f else 0.4f
+        clearButton.isEnabled = hasText
+        clearButton.alpha = if (hasText) 1f else 0.4f
+    }
+
+    /** Update the character counter text. */
+    private fun updateCharCounter() {
+        val len = inputField.text?.length ?: 0
+        charCounter.text = if (len > 0) "$len chars" else ""
+    }
+
+    /** Animate the segmented control indicator to the selected segment. */
+    private fun updateSegmentIndicator(isLive: Boolean, animate: Boolean) {
+        val parent = segmentIndicator.parent as? FrameLayout ?: return
+        val totalWidth = parent.width - parent.paddingLeft - parent.paddingRight
+        val halfWidth = totalWidth / 2
+        val targetX = if (isLive) 0f else halfWidth.toFloat()
+
+        // Set indicator width
+        segmentIndicator.layoutParams = segmentIndicator.layoutParams.apply {
+            width = halfWidth
+        }
+        segmentIndicator.requestLayout()
+
+        if (animate) {
+            segmentIndicator.animate()
+                .translationX(targetX)
+                .setDuration(250)
+                .setInterpolator(OvershootInterpolator(0.8f))
+                .start()
+        } else {
+            segmentIndicator.translationX = targetX
+        }
+
+        // Update text colors
+        val accentOnColor = ContextCompat.getColor(this, R.color.text_on_accent)
+        val secondaryColor = ContextCompat.getColor(this, R.color.text_secondary)
+        segmentLive.setTextColor(if (isLive) accentOnColor else secondaryColor)
+        segmentCompose.setTextColor(if (isLive) secondaryColor else accentOnColor)
+    }
+
+    /** Add scale-down press animation to a view. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun addPressAnimation(view: View) {
+        view.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate().scaleX(0.93f).scaleY(0.93f).setDuration(80).start()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+                }
+            }
+            false // don't consume — let onClick fire
+        }
+    }
+
+    /** Start pulsing glow on the connected status dot. */
+    private fun startPulse() {
+        pulseAnimator?.cancel()
+        pulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            statusIndicator,
+            PropertyValuesHolder.ofFloat(View.SCALE_X, 1f, 1.3f, 1f),
+            PropertyValuesHolder.ofFloat(View.SCALE_Y, 1f, 1.3f, 1f),
+            PropertyValuesHolder.ofFloat(View.ALPHA, 1f, 0.6f, 1f)
+        ).apply {
+            duration = 2000L
+            repeatCount = ObjectAnimator.INFINITE
+            start()
+        }
+    }
+
+    /** Stop pulsing glow. */
+    private fun stopPulse() {
+        pulseAnimator?.cancel()
+        statusIndicator.scaleX = 1f
+        statusIndicator.scaleY = 1f
+        statusIndicator.alpha = 1f
     }
 
     private fun updateHintVisibility() {
@@ -509,17 +635,27 @@ class MainActivity : AppCompatActivity() {
         // Show only the latest character, replacing any previous one
         liveEchoText.text = char.toString()
 
-        // Subtle pop-in animation for every keystroke
+        // Pop-in animation with overshoot for a premium feel
         liveEchoText.animate().cancel()
-        liveEchoText.scaleX = 0.8f
-        liveEchoText.scaleY = 0.8f
+        liveEchoText.scaleX = 0.5f
+        liveEchoText.scaleY = 0.5f
         liveEchoText.alpha = 0f
+        // Flash accent color briefly
+        liveEchoText.setTextColor(ContextCompat.getColor(this, R.color.accent))
         liveEchoText.animate()
             .scaleX(1f)
             .scaleY(1f)
             .alpha(1f)
-            .setDuration(150)
-            .setInterpolator(DecelerateInterpolator())
+            .setDuration(200)
+            .setInterpolator(OvershootInterpolator(2f))
+            .withEndAction {
+                // Fade color back to tertiary
+                liveEchoText.animate()
+                    .setDuration(400)
+                    .withEndAction {
+                        liveEchoText.setTextColor(ContextCompat.getColor(this, R.color.text_tertiary))
+                    }.start()
+            }
             .start()
 
         // Cancel any pending clear and schedule a new one after 2 seconds
@@ -582,6 +718,7 @@ class MainActivity : AppCompatActivity() {
 
             statusText.text = "Connected to: $displayName"
             statusIndicator.setBackgroundResource(R.drawable.status_connected)
+            startPulse()
 
             // Animated switch to connected state
             fadeOutView(settingsButton)
@@ -597,10 +734,12 @@ class MainActivity : AppCompatActivity() {
             // Now that typing section is visible, apply mode UI + auto-open keyboard
             // Small delay to let the layout transition complete
             typingSection.postDelayed({
+                updateSegmentIndicator(isLiveMode, animate = false)
                 updateModeUI(isLiveMode)
             }, 300)
         } else {
             // Animated switch to disconnected state
+            stopPulse()
             fadeOutView(connectedBar)
             fadeOutView(connectedMenuButton)
             fadeOutView(typingSection)
