@@ -209,8 +209,7 @@ class SettingsActivity : AppCompatActivity() {
         val currentIndex = delayValues.indexOf(currentDelay).coerceAtLeast(0)
 
         AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Keystroke delay")
-            .setMessage("Extra delay between keystrokes in Compose mode.\nIncrease if characters are dropped.")
+            .setTitle("Keystroke delay\nIncrease if characters are dropped")
             .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
                 val newDelay = delayValues[which]
                 hidService.keystrokeDelayMs = newDelay
