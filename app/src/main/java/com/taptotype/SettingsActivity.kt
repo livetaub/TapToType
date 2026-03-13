@@ -21,9 +21,7 @@ class SettingsActivity : AppCompatActivity() {
         const val PREF_THEME_MODE = "theme_mode"
         const val PREF_SHIFT_ENTER = "enter_is_shift"
         const val PREF_DEFAULT_MODE = "default_mode" // 0 = live, 1 = type & send
-        const val PREF_COMPOSE_SEND_MODE = "compose_send_mode" // 0 = type, 1 = paste
         const val PREF_KEYSTROKE_DELAY = "keystroke_delay_ms" // 0, 5, 10, ... 50
-        const val PREF_PASTE_DELAY = "paste_delay_ms" // delay before Ctrl+V in paste mode
     }
 
     private lateinit var hidService: BluetoothHidService
@@ -77,23 +75,12 @@ class SettingsActivity : AppCompatActivity() {
         findViewById<TextView>(R.id.settingEnterValue).text =
             if (useShiftEnter) "Line break (Shift+Enter)" else "Submit (Enter)"
 
-        // Compose send method
-        val composeSendMode = prefs.getInt(PREF_COMPOSE_SEND_MODE, 0)
-        findViewById<TextView>(R.id.settingComposeSendValue).text = when (composeSendMode) {
-            1 -> "Paste (instant via Ctrl+V)"
-            else -> "Type (keystroke by keystroke)"
-        }
-
         // Keystroke delay
         val keystrokeDelay = prefs.getLong(PREF_KEYSTROKE_DELAY, 0L)
         findViewById<TextView>(R.id.settingKeystrokeDelayValue).text = when {
             keystrokeDelay == 0L -> "0 ms (fastest)"
             else -> "$keystrokeDelay ms"
         }
-
-        // Paste delay
-        val pasteDelay = prefs.getLong(PREF_PASTE_DELAY, 2000L)
-        findViewById<TextView>(R.id.settingPasteDelayValue).text = "${pasteDelay / 1000.0} s"
     }
 
     private fun setupClickListeners() {
@@ -112,19 +99,9 @@ class SettingsActivity : AppCompatActivity() {
             showEnterKeySelector()
         }
 
-        // Compose send method
-        findViewById<LinearLayout>(R.id.settingComposeSend).setOnClickListener {
-            showComposeSendSelector()
-        }
-
         // Keystroke delay
         findViewById<LinearLayout>(R.id.settingKeystrokeDelay).setOnClickListener {
             showKeystrokeDelaySelector()
-        }
-
-        // Paste delay
-        findViewById<LinearLayout>(R.id.settingPasteDelay).setOnClickListener {
-            showPasteDelaySelector()
         }
 
         // Re-init BT
@@ -270,41 +247,11 @@ class SettingsActivity : AppCompatActivity() {
 
         AlertDialog.Builder(this, R.style.DialogTheme)
             .setTitle("Keystroke delay")
-            .setMessage("Extra delay between keystrokes in Compose → Type mode.\nIncrease if characters are dropped.")
+            .setMessage("Extra delay between keystrokes in Compose mode.\nIncrease if characters are dropped.")
             .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
                 val newDelay = delayValues[which]
                 hidService.keystrokeDelayMs = newDelay
                 prefs.edit().putLong(PREF_KEYSTROKE_DELAY, newDelay).apply()
-                dialog.dismiss()
-                refreshValues()
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun showPasteDelaySelector() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val currentDelay = prefs.getLong(PREF_PASTE_DELAY, 2000L)
-
-        // Options: 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000
-        val delayValues = (500..5000 step 500).map { it.toLong() }
-        val labels = delayValues.map { ms ->
-            val sec = ms / 1000.0
-            when (ms) {
-                2000L -> "$sec s (recommended)"
-                else -> "$sec s"
-            }
-        }.toTypedArray()
-
-        val currentIndex = delayValues.indexOf(currentDelay).coerceAtLeast(0)
-
-        AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Paste delay")
-            .setMessage("Wait time for clipboard sync (e.g. Phone Link) before sending Ctrl+V.\nIncrease if wrong text is pasted.")
-            .setSingleChoiceItems(labels, currentIndex) { dialog, which ->
-                val newDelay = delayValues[which]
-                hidService.pasteDelayMs = newDelay
-                prefs.edit().putLong(PREF_PASTE_DELAY, newDelay).apply()
                 dialog.dismiss()
                 refreshValues()
             }

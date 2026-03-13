@@ -214,55 +214,6 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Compose Send Method -->
-            <LinearLayout
-                android:id="@+id/settingComposeSend"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_send"
-                    android:scaleType="centerInside"
-                    android:padding="8dp"
-                    android:layout_marginEnd="16dp" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Compose send method"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary"
-                        android:fontFamily="sans-serif" />
-
-                    <TextView
-                        android:id="@+id/settingComposeSendValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Type (keystroke by keystroke)"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif"
-                        android:paddingTop="2dp" />
-                </LinearLayout>
-            </LinearLayout>
-
             <!-- Keystroke delay -->
             <LinearLayout
                 android:id="@+id/settingKeystrokeDelay"
@@ -305,55 +256,6 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="0 ms (fastest)"
-                        android:textSize="13sp"
-                        android:textColor="@color/text_secondary"
-                        android:fontFamily="sans-serif"
-                        android:paddingTop="2dp" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <!-- Paste delay -->
-            <LinearLayout
-                android:id="@+id/settingPasteDelay"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:background="?attr/selectableItemBackground"
-                android:paddingStart="16dp"
-                android:paddingEnd="16dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp"
-                android:clickable="true"
-                android:focusable="true">
-
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:src="@drawable/ic_send"
-                    android:scaleType="centerInside"
-                    android:padding="8dp"
-                    android:layout_marginEnd="16dp" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Paste delay"
-                        android:textSize="16sp"
-                        android:textColor="@color/text_primary"
-                        android:fontFamily="sans-serif" />
-
-                    <TextView
-                        android:id="@+id/settingPasteDelayValue"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="2.0 s"
                         android:textSize="13sp"
                         android:textColor="@color/text_secondary"
                         android:fontFamily="sans-serif"
