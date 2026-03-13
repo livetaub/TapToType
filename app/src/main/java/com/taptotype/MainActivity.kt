@@ -460,14 +460,14 @@ class MainActivity : AppCompatActivity() {
                         val deletedCount = previousText.length - currentText.length
                         repeat(deletedCount) {
                             hidService.sendBackspace()
-                            addEchoChar('âŒ«')
+                            addEchoChar('\u232B')
                         }
                     } else if (currentText.length > previousText.length) {
                         val newChars = currentText.substring(previousText.length)
                         for (char in newChars) {
                             if (char == '\n') {
                                 hidService.sendEnter()
-                                addEchoChar('â†µ')
+                                addEchoChar('\u21B5')
                             } else {
                                 hidService.sendKeyPress(char)
                                 addEchoChar(char)
@@ -491,7 +491,7 @@ class MainActivity : AppCompatActivity() {
         inputField.onEmptyBackspace = {
             if (isLiveMode && hidService.isConnected) {
                 hidService.sendBackspace()
-                addEchoChar('âŒ«')
+                addEchoChar('\u232B')
             }
         }
 
