@@ -191,43 +191,6 @@ class SettingsActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showComposeSendSelector() {
-        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
-        val current = prefs.getInt(PREF_COMPOSE_SEND_MODE, 0)
-        AlertDialog.Builder(this, R.style.DialogTheme)
-            .setTitle("Compose send method")
-            .setSingleChoiceItems(
-                arrayOf(
-                    "Type (keystroke by keystroke)",
-                    "Paste (instant via Ctrl+V)"
-                ),
-                current
-            ) { dialog, which ->
-                hidService.composeSendMode = which
-                prefs.edit().putInt(PREF_COMPOSE_SEND_MODE, which).apply()
-                dialog.dismiss()
-                refreshValues()
-
-                if (which == 1) {
-                    // Show helpful info about paste mode requirements
-                    AlertDialog.Builder(this, R.style.DialogTheme)
-                        .setTitle("\uD83D\uDCCB  Paste mode")
-                        .setMessage(
-                            "Paste mode copies the text to your phone's clipboard, then " +
-                            "sends Ctrl+V to your PC.\n\n" +
-                            "For this to work, you need clipboard sync between your phone and PC. " +
-                            "The easiest way:\n\n" +
-                            "\u2022 Windows: Use \"Phone Link\" (built into Windows 10/11)\n" +
-                            "\u2022 Or enable Cloud Clipboard in Windows Settings → System → Clipboard\n\n" +
-                            "Once set up, your message will appear instantly on the PC!"
-                        )
-                        .setPositiveButton("Got it", null)
-                        .show()
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
 
     private fun showKeystrokeDelaySelector() {
         val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)

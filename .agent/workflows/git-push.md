@@ -4,14 +4,14 @@ description: Git commit and push workflow
 
 ## Rules
 
-1. **Never push to git automatically.** Only commit and push after the user explicitly confirms the changes are accepted and ready to push.
+1. **Never commit or push to git automatically.** Only after the user explicitly confirms the changes are accepted and ready to push.
 2. When changes are ready for review, summarize what was changed and ask the user if they want to push.
 3. Use separate `git add` and `git commit` commands (PowerShell doesn't support `&&`).
 4. Keep commit messages concise and descriptive.
 
 ## Version Bump (Before Every Push)
 
-Before committing, **always** auto-increment the version in `version.properties` (project root):
+Before committing, ask user if they want to increment the version in `version.properties` (project root):
 
 1. Read the current `version.properties` file which contains:
    ```
